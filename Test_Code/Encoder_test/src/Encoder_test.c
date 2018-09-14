@@ -27,6 +27,8 @@
 #include <stdio.h>
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
+#include "inc/hw_gpio.h"
+#include "inc/hw_ints.h"
 #include "driverlib/debug.h"
 #include "driverlib/fpu.h"
 #include "driverlib/gpio.h"
@@ -100,12 +102,48 @@ ConfigureUART(void)
 }
 
 // Set up encoder modules
-void ConfigureQEI(void) {
+void ConfigureQEI0(void) {
+  // Enable peripherals
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_QEI0);
+
+  // from "https://forum.43oh.com/topic/7170-using-harware-qei-on-tiva-launchpad/":
+
+  //Unlock GPIOD7 - Like PF0 its used for NMI - Without this step it doesn't work
+	HWREG(GPIO_PORTD_BASE + GPIO_O_LOCK) = GPIO_LOCK_KEY; //In Tiva include this is the same as "_DD" in older versions (0x4C4F434B)
+	HWREG(GPIO_PORTD_BASE + GPIO_O_CR) |= 0x80;
+	HWREG(GPIO_PORTD_BASE + GPIO_O_LOCK) = 0;
+
+  // Set pins for QEI0
+  GPIOPinConfigure(GPIO_PD6_PHA0);
+  GPIOPinConfigure(GPIO_PD7_PHB0);
+  //GPIOPinConfigure( index );
+
+  //Set GPIO pins for QEI. PhA0 -> PD6, PhB0 ->PD7. I believe this sets the pull up and makes them inputs
+	GPIOPinTypeQEI(GPIO_PORTD_BASE, GPIO_PIN_6 |  GPIO_PIN_7);
+
+	//DISable peripheral and int before configuration
+	QEIDisable(QEI0_BASE);
+	QEIIntDisable(QEI0_BASE,QEI_INTERROR | QEI_INTDIR | QEI_INTTIMER | QEI_INTINDEX);
+
+	// Configure quadrature encoder, use an arbitrary top limit of 1000
+	QEIConfigure(QEI0_BASE, (QEI_CONFIG_CAPTURE_A_B  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 8191);
+  QEIVelocityConfigure(QEI0_BASE, QEI_VELDIV_1, 500000);
+
+	// Enable the quadrature encoder.
+	QEIEnable(QEI0_BASE);
+  QEIVelocityEnable(QEI0_BASE);
+
+	//Set position to a middle value so we can see if things are working
+	QEIPositionSet(QEI0_BASE, 4096);
+}
+
+void ConfigureQEI1(void) {
   // Enable peripherals
   SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
   SysCtlPeripheralEnable(SYSCTL_PERIPH_QEI1);
 
-  // Set pins for QEI0
+  // Set pins for QEI1
   GPIOPinConfigure(GPIO_PC5_PHA1);
   GPIOPinConfigure(GPIO_PC6_PHB1);
   //GPIOPinConfigure( index );
@@ -121,13 +159,15 @@ void ConfigureQEI(void) {
 	QEIIntDisable(QEI1_BASE,QEI_INTERROR | QEI_INTDIR | QEI_INTTIMER | QEI_INTINDEX);
 
 	// Configure quadrature encoder, use an arbitrary top limit of 1000
-	QEIConfigure(QEI1_BASE, (QEI_CONFIG_CAPTURE_A  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 1000);
+	QEIConfigure(QEI1_BASE, (QEI_CONFIG_CAPTURE_A_B  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 8191);
+  QEIVelocityConfigure(QEI1_BASE, QEI_VELDIV_1, 500000);
 
 	// Enable the quadrature encoder.
 	QEIEnable(QEI1_BASE);
+  QEIVelocityEnable(QEI1_BASE);
 
 	//Set position to a middle value so we can see if things are working
-	QEIPositionSet(QEI1_BASE, 500);
+	QEIPositionSet(QEI1_BASE, 4096);
 }
 
 //*****************************************************************************
@@ -170,7 +210,8 @@ main(void)
     ConfigureUART();
 
     // Initialize the QEI module
-    ConfigureQEI();
+    ConfigureQEI0();
+    ConfigureQEI1();
 
     //
     // Hello!
@@ -181,7 +222,20 @@ main(void)
     // We are finished.  Hang around doing nothing.
     //
 
-    unsigned int qeiPos = 0;
+    unsigned int Pos0 = 0;
+    unsigned int Pos1 = 0;
+
+    int Vel0 = 0;
+    int Vel1 = 0;
+
+    //int Spd0 = 0;
+    //int Spd1 = 0;
+
+    int U0 = 0;
+    int U1 = 0;
+
+    int k = 0;
+    int b = 2;
 
     while(1)
     {
@@ -194,7 +248,7 @@ main(void)
         //
         // Delay for a bit.
         //
-        SysCtlDelay(SysCtlClockGet() / 10 / 3);
+        SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
 
         //
         // Turn off the BLUE LED.
@@ -205,14 +259,24 @@ main(void)
         //
         // Delay for a bit.
         //
-        SysCtlDelay(SysCtlClockGet() / 10 / 3);
+        SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
 
         //
-        // Send position value
+        // Send position and velocity values
         //
-        qeiPos = QEIPositionGet(QEI1_BASE);
-        //sprintf(msg, "%u", qeiPos);
-        UARTprintf("%u\n", qeiPos);
+        Pos0 = QEIPositionGet(QEI0_BASE)/23;
+        Pos1 = QEIPositionGet(QEI1_BASE)/23;
+
+        Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
+        Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
+
+        //Spd0 = QEIVelocityGet(QEI0_BASE);
+        //Spd1 = QEIVelocityGet(QEI1_BASE);
+
+        U0 = (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
+        U1 = (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+
+        UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
 
     }
 }

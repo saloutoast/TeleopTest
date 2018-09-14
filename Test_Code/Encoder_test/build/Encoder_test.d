@@ -25,6 +25,8 @@ build/Encoder_test.o: src/Encoder_test.c \
  /home/andrew/Embedded/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/stdio.h \
  /home/andrew/Embedded/tivaware/inc/hw_memmap.h \
  /home/andrew/Embedded/tivaware/inc/hw_types.h \
+ /home/andrew/Embedded/tivaware/inc/hw_gpio.h \
+ /home/andrew/Embedded/tivaware/inc/hw_ints.h \
  /home/andrew/Embedded/tivaware/driverlib/debug.h \
  /home/andrew/Embedded/tivaware/driverlib/fpu.h \
  /home/andrew/Embedded/tivaware/driverlib/gpio.h \
