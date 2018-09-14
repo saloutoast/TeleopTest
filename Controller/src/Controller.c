@@ -37,6 +37,8 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 #include "driverlib/qei.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/timer.h"
 #include "utils/uartstdio.h"
 
 
@@ -169,6 +171,29 @@ void ConfigureQEI1(void) {
 	//Set position to a middle value so we can see if things are working
 	QEIPositionSet(QEI1_BASE, 4096);
 }
+
+
+
+// Timer init code from "https://gist.github.com/robertinant/10398194"
+
+/* void initTimer()
+{
+  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+  ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);   // 32 bits Timer
+  TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0Isr);    // Registering  isr
+  ROM_TimerEnable(TIMER0_BASE, TIMER_A);
+  ROM_IntEnable(INT_TIMER0A);
+  ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+}
+
+void Timer0Isr(void)
+{
+  ROM_TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);  // Clear the timer interrupt
+  digitalWrite(RED_LED, digitalRead(RED_LED) ^ 1);              // toggle LED pin
+} */
+
+
+
 
 //*****************************************************************************
 //
