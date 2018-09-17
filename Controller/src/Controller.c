@@ -192,12 +192,16 @@ void Timer0Isr(void)
   digitalWrite(RED_LED, digitalRead(RED_LED) ^ 1);              // toggle LED pin
 } */
 
+// Initialize PWM module and digital output
 
+/* void initPWM_DigOut(void) {
 
+} */
 
 //*****************************************************************************
 //
-// Print "Hello World!" to the UART on the evaluation board.
+// Main control loop that checks for the timer interrupt flag and determines the
+// new control efforts based on encoder measurements
 //
 //*****************************************************************************
 int
@@ -238,15 +242,9 @@ main(void)
     ConfigureQEI0();
     ConfigureQEI1();
 
-    //
-    // Hello!
-    //
-    UARTprintf("Hello, world!\n");
+    // Initialize the PWM module and digitial outputs
 
-    //
-    // We are finished.  Hang around doing nothing.
-    //
-
+    // Initialize the controller variables
     unsigned int Pos0 = 0;
     unsigned int Pos1 = 0;
 
