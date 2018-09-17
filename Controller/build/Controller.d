@@ -37,4 +37,5 @@ build/Controller.o: src/Controller.c \
  /home/andrew/Embedded/tivaware/driverlib/qei.h \
  /home/andrew/Embedded/tivaware/driverlib/interrupt.h \
  /home/andrew/Embedded/tivaware/driverlib/timer.h \
+ /home/andrew/Embedded/tivaware/driverlib/pwm.h \
  /home/andrew/Embedded/tivaware/utils/uartstdio.h

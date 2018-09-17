@@ -39,6 +39,7 @@
 #include "driverlib/qei.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/timer.h"
+#include "driverlib/pwm.h"
 #include "utils/uartstdio.h"
 
 
@@ -66,6 +67,8 @@ __error__(char *pcFilename, uint32_t ui32Line)
 {
 }
 #endif
+
+static volatile int controller_flag = 0;
 
 //*****************************************************************************
 //
@@ -174,23 +177,32 @@ void ConfigureQEI1(void) {
 
 
 
-// Timer init code from "https://gist.github.com/robertinant/10398194"
-
-/* void initTimer()
-{
-  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
-  ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);   // 32 bits Timer
-  TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0Isr);    // Registering  isr
-  ROM_TimerEnable(TIMER0_BASE, TIMER_A);
-  ROM_IntEnable(INT_TIMER0A);
-  ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-}
-
-void Timer0Isr(void)
+// Timer init code from "https://gist.github.com/robertinant/10398194" and "timers.c" in examples folder
+void Timer0ISR(void)
 {
   ROM_TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);  // Clear the timer interrupt
-  digitalWrite(RED_LED, digitalRead(RED_LED) ^ 1);              // toggle LED pin
-} */
+
+  // set global flag for new control values
+  if(controller_flag==0) {
+    controller_flag = 1;
+  }
+
+  // toggle an LED here?
+
+}
+
+void initTimer(void)
+{
+  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0); // enable peripheral
+  ROM_IntMasterEnable(); // enable processor interrupts
+  ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);   // 32 bits Timer
+  ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, ROM_SysCtlClockGet()/2); // set to roll over at 10Hz
+  ROM_IntEnable(INT_TIMER0A); // enable interrupt on timer timeout
+  ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+  TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0ISR);    // Registering  isr
+  ROM_TimerEnable(TIMER0_BASE, TIMER_A); // enable the timer
+
+}
 
 // Initialize PWM module and digital output
 
@@ -204,6 +216,8 @@ void Timer0Isr(void)
 // new control efforts based on encoder measurements
 //
 //*****************************************************************************
+
+
 int
 main(void)
 {
@@ -233,14 +247,15 @@ main(void)
     GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_2);
     GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3);
 
-    //
     // Initialize the UART.
-    //
     ConfigureUART();
 
     // Initialize the QEI module
     ConfigureQEI0();
     ConfigureQEI1();
+
+    // Initialize timer for controller interrupts
+    initTimer();
 
     // Initialize the PWM module and digitial outputs
 
@@ -262,44 +277,55 @@ main(void)
 
     while(1)
     {
-        //
-        // Turn on the LED.
-        //
-        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
-        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
+        // TODO: move all of this into an if() statement on flag set in the timer interrupt (start at ~10 Hz)
+        if (controller_flag==1) {
 
-        //
-        // Delay for a bit.
-        //
-        SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
+          //
+          // Turn on the LED.
+          //
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 
-        //
-        // Turn off the BLUE LED.
-        //
-        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+          //
+          // Delay for a bit.
+          //
+          SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
 
-        //
-        // Delay for a bit.
-        //
-        SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
+          //
+          // Turn off the BLUE LED.
+          //
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
 
-        //
-        // Send position and velocity values
-        //
-        Pos0 = QEIPositionGet(QEI0_BASE)/23;
-        Pos1 = QEIPositionGet(QEI1_BASE)/23;
+          //
+          // Delay for a bit.
+          //
+          SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
 
-        Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
-        Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
+          //
+          // Send position and velocity values
+          //
+          Pos0 = QEIPositionGet(QEI0_BASE)/23;
+          Pos1 = QEIPositionGet(QEI1_BASE)/23;
 
-        //Spd0 = QEIVelocityGet(QEI0_BASE);
-        //Spd1 = QEIVelocityGet(QEI1_BASE);
+          Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
+          Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
-        U0 = (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
-        U1 = (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+          //Spd0 = QEIVelocityGet(QEI0_BASE);
+          //Spd1 = QEIVelocityGet(QEI1_BASE);
 
-        UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
+          U0 = (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
+          U1 = (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+
+          // TODO: set new PWM values here and sync the PWM updates
+
+          // TODO: make a variable to time this UART transmission, print that to console as well
+          UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
+
+          // reset controller flag for next interrupt
+          controller_flag = 0;
+
+        }
 
     }
 }
