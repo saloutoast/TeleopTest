@@ -103,7 +103,7 @@ ConfigureUART(void)
     //
     // Initialize the UART for console I/O.
     //
-    UARTStdioConfig(0, 115200, 16000000);
+    UARTStdioConfig(0, 460800, 16000000);
 }
 
 // Set up encoder modules
@@ -196,7 +196,7 @@ void initTimer(void)
   ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0); // enable peripheral
   ROM_IntMasterEnable(); // enable processor interrupts
   ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);   // 32 bits Timer
-  ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, ROM_SysCtlClockGet()/2); // set to roll over at 10Hz
+  ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, ROM_SysCtlClockGet()/1000); // set to roll over at 1kHz
   ROM_IntEnable(INT_TIMER0A); // enable interrupt on timer timeout
   ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
   TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0ISR);    // Registering  isr
@@ -266,63 +266,50 @@ main(void)
     int Vel0 = 0;
     int Vel1 = 0;
 
-    //int Spd0 = 0;
-    //int Spd1 = 0;
-
     int U0 = 0;
     int U1 = 0;
 
-    int k = 0;
+    int k = 1;
     int b = 2;
+
+    int before = 0;
+    int after = 0;
+    int transmit_time = 0;
 
     while(1)
     {
-        // TODO: move all of this into an if() statement on flag set in the timer interrupt (start at ~10 Hz)
+        // main controller to execute after each timer interrupt
         if (controller_flag==1) {
 
-          //
-          // Turn on the LED.
-          //
+          // Turn on the LED. Can scope these pins for interrupt execution timing
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 
-          //
-          // Delay for a bit.
-          //
-          SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
 
-          //
-          // Turn off the BLUE LED.
-          //
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
-
-          //
-          // Delay for a bit.
-          //
-          SysCtlDelay(SysCtlClockGet() / 3 / 1250000);
-
-          //
-          // Send position and velocity values
-          //
-          Pos0 = QEIPositionGet(QEI0_BASE)/23;
+          // Get position and velocity values
+          Pos0 = QEIPositionGet(QEI0_BASE)/23; // mapped to degrees
           Pos1 = QEIPositionGet(QEI1_BASE)/23;
 
           Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
-          //Spd0 = QEIVelocityGet(QEI0_BASE);
-          //Spd1 = QEIVelocityGet(QEI1_BASE);
-
+          // Calculate control efforts
           U0 = (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
           U1 = (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
 
           // TODO: set new PWM values here and sync the PWM updates
 
-          // TODO: make a variable to time this UART transmission, print that to console as well
-          UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
+          // transmit data (printing takes about 3ms -> max frequency around 300 Hz)
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of transmission separate from control calculations
+          before = TimerValueGet(TIMER0_BASE, TIMER_A);
+          UARTprintf("%u, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1, transmit_time);
+          after = TimerValueGet(TIMER0_BASE, TIMER_A);
+          transmit_time = before - after;
 
-          // reset controller flag for next interrupt
+          // Turn off the LED.
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+
+          // Reset controller flag for next interrupt
           controller_flag = 0;
 
         }
