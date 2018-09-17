@@ -196,7 +196,7 @@ void initTimer(void)
   ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0); // enable peripheral
   ROM_IntMasterEnable(); // enable processor interrupts
   ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);   // 32 bits Timer
-  ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, ROM_SysCtlClockGet()/1000); // set to roll over at 1kHz
+  ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, ROM_SysCtlClockGet()/500); // set to roll over at 1kHz
   ROM_IntEnable(INT_TIMER0A); // enable interrupt on timer timeout
   ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
   TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0ISR);    // Registering  isr
@@ -205,10 +205,34 @@ void initTimer(void)
 }
 
 // Initialize PWM module and digital output
+void initMotorControl(void) {
 
-/* void initPWM_DigOut(void) {
+  // PWM section
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
 
-} */
+  SysCtlPWMClockSet(SYSCTL_PWMDIV_1); // clock predivider for PWM frequency
+
+  GPIOPinConfigure(GPIO_PB6_M0PWM0);
+  GPIOPinConfigure(GPIO_PB7_M0PWM1);
+
+  GPIOPinTypePWM(GPIO_PORTB_BASE, GPIO_PIN_6 | GPIO_PIN_7);
+
+  PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
+
+  PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, 3200); // ~15 kHz PWM signal
+
+  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, 1600); // starting PWM duty cycles
+  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 1600);
+
+  IntMasterEnable();
+
+  PWMGenEnable(PWM0_BASE, PWM_GEN_0);
+  PWMOutputState(PWM0_BASE, (PWM_OUT_0_BIT | PWM_OUT_1_BIT), true);
+
+  // digital outputs?
+
+}
 
 //*****************************************************************************
 //
@@ -258,6 +282,7 @@ main(void)
     initTimer();
 
     // Initialize the PWM module and digitial outputs
+    initMotorControl();
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
@@ -269,8 +294,8 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 1;
-    int b = 2;
+    int k = 5;
+    int b = 10;
 
     int before = 0;
     int after = 0;
@@ -293,10 +318,18 @@ main(void)
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts
-          U0 = (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
-          U1 = (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+          U0 = 1600 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
+          U1 = 1600 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
 
-          // TODO: set new PWM values here and sync the PWM updates
+          if (U0 < 1) { U0 = 1; }
+          if (U0 > 3199) { U0 = 3199; }
+
+          if (U1 < 1) { U1 = 1; }
+          if (U1 > 3199) { U1 = 3199; }
+
+          // set new PWM values here
+          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0); // starting PWM duty cycles
+          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
           // transmit data (printing takes about 3ms -> max frequency around 300 Hz)
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of transmission separate from control calculations
