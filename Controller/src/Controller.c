@@ -237,8 +237,8 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 5;
-    int b = 10;
+    int k = 100;
+    int b = 0;
 
     int before = 0;
     int after = 0;
@@ -264,11 +264,11 @@ main(void)
           U0 = 5000 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
           U1 = 5000 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
 
-          if (U0 < 1) { U0 = 1; }
-          if (U0 > 9999) { U0 = 9999; }
+          if (U0 < 1500) { U0 = 1500; } // limit to 15% and 85% for driver modules
+          if (U0 > 8500) { U0 = 8500; }
 
-          if (U1 < 1) { U1 = 1; }
-          if (U1 > 9999) { U1 = 9999; }
+          if (U1 < 1500) { U1 = 1500; }
+          if (U1 > 8500) { U1 = 8500; }
 
           // set new PWM values
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
