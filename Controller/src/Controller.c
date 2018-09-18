@@ -128,8 +128,6 @@ void ConfigureQEI1(void) {
 	QEIPositionSet(QEI1_BASE, 4096);
 }
 
-
-
 // Timer init code from "https://gist.github.com/robertinant/10398194" and "timers.c" in examples folder
 void Timer0ISR(void)
 {
@@ -229,8 +227,11 @@ main(void)
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
+    unsigned int LastPos0 = 0;
     unsigned int Pos1 = 0;
+    unsigned int LastPos1 = 0;
     int PosDiff = 0;
+    int PosDiffTemp = 0;
 
     int Vel0 = 0;
     int Vel1 = 0;
@@ -238,12 +239,12 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 10;
-    int b = 0;
+    int k = 50;
+    int b = 100;
 
-    int before = 0;
-    int after = 0;
-    int transmit_time = 0;
+    //int before = 0;
+    //int after = 0;
+    //int transmit_time = 0;
 
     while(1)
     {
@@ -262,13 +263,16 @@ main(void)
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
-          PosDiff = Pos1 - Pos0; // calculate difference with 0 wrapping
-          if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
-          if ((Pos0<2048) & (Pos1>6144)) { PosDiff = Pos0 + 8192 - Pos1; }
+          PosDiff = PosDiff + (Pos1-LastPos1) - (Pos0-LastPos0); // calculate difference with 0 wrapping
+          LastPos0 = Pos0;
+          LastPos1 = Pos1;
+          //if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
+          //if ((Pos0<2048) & (Pos1>6144)) { PosDiff = Pos0 + 8192 - Pos1; }
 
-          if ((PosDiff<50) & (PosDiff>-50)) { PosDiff = 0; }
-          U0 = 5000 - (k*(PosDiff)) + (b*(Vel1-Vel0));
-          U1 = 5000 + (k*(PosDiff)) + (b*(Vel1-Vel0));
+          if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
+          else { PosDiffTemp = PosDiff; }
+          U0 = 5000 - (k*(PosDiffTemp)) - (b*(Vel1-Vel0));
+          U1 = 5000 + (k*(PosDiffTemp)) + (b*(Vel1-Vel0));
 
           if (U0 < 1500) { U0 = 1500; } // limit to 15% and 85% for driver modules
           if (U0 > 8500) { U0 = 8500; }
@@ -282,10 +286,10 @@ main(void)
 
           // transmit data
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of transmission separate from control calculations
-          before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%u, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1, transmit_time);
-          after = TimerValueGet(TIMER0_BASE, TIMER_A);
-          transmit_time = before - after;
+          //before = TimerValueGet(TIMER0_BASE, TIMER_A);
+          UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
+          //after = TimerValueGet(TIMER0_BASE, TIMER_A);
+          //transmit_time = before - after;
 
           // Turn off the LED.
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
