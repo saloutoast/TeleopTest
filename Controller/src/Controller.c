@@ -183,7 +183,10 @@ void initMotorControl(void) {
   PWMGenEnable(PWM0_BASE, PWM_GEN_0);
   PWMOutputState(PWM0_BASE, (PWM_OUT_0_BIT | PWM_OUT_1_BIT), true);
 
-  // digital outputs?
+  // digital outputs to enable the driver boards
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+  GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0); // D0 for module 0
+  GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_1); // D1 for module 1
 
 }
 
@@ -221,6 +224,8 @@ main(void)
 
     // Initialize the PWM module and digitial outputs
     initMotorControl();
+    GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_0, GPIO_PIN_0);
+    GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_1, GPIO_PIN_1);
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
