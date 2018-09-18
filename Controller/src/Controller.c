@@ -173,10 +173,10 @@ void initMotorControl(void) {
 
   PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
 
-  PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, 3200); // ~15 kHz PWM signal
+  PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, 6000); // PWM signal
 
-  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, 1600); // starting PWM duty cycles
-  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 1600);
+  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, 3000); // starting PWM duty cycles
+  PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 3000);
 
   IntMasterEnable();
 
@@ -261,14 +261,14 @@ main(void)
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
-          U0 = 1600 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
-          U1 = 1600 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+          U0 = 3000 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
+          U1 = 3000 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
 
           if (U0 < 1) { U0 = 1; }
-          if (U0 > 3199) { U0 = 3199; }
+          if (U0 > 5999) { U0 = 5999; }
 
           if (U1 < 1) { U1 = 1; }
-          if (U1 > 3199) { U1 = 3199; }
+          if (U1 > 5999) { U1 = 5999; }
 
           // set new PWM values
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
