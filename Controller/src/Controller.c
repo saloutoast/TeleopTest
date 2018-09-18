@@ -230,6 +230,7 @@ main(void)
     // Initialize the controller variables
     unsigned int Pos0 = 0;
     unsigned int Pos1 = 0;
+    int PosDiff = 0;
 
     int Vel0 = 0;
     int Vel1 = 0;
@@ -237,7 +238,7 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 100;
+    int k = 10;
     int b = 0;
 
     int before = 0;
@@ -254,15 +255,20 @@ main(void)
 
 
           // Get position and velocity values
-          Pos0 = QEIPositionGet(QEI0_BASE)/23; // mapped to degrees
-          Pos1 = QEIPositionGet(QEI1_BASE)/23;
+          Pos0 = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
+          Pos1 = QEIPositionGet(QEI1_BASE);
 
           Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
-          U0 = 5000 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
-          U1 = 5000 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
+          PosDiff = Pos1 - Pos0; // calculate difference with 0 wrapping
+          if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
+          if ((Pos0<2048) & (Pos1>6144)) { PosDiff = Pos0 + 8192 - Pos1; }
+
+          if ((PosDiff<50) & (PosDiff>-50)) { PosDiff = 0; }
+          U0 = 5000 - (k*(PosDiff)) + (b*(Vel1-Vel0));
+          U1 = 5000 + (k*(PosDiff)) + (b*(Vel1-Vel0));
 
           if (U0 < 1500) { U0 = 1500; } // limit to 15% and 85% for driver modules
           if (U0 > 8500) { U0 = 8500; }
