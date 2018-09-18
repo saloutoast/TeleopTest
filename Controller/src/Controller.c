@@ -173,7 +173,7 @@ void initMotorControl(void) {
 
   PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
 
-  PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, 10000); // PWM signal
+  PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, 10000); // PWM signal at 5KHz
 
   PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, 5000); // starting PWM duty cycles
   PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 5000);
@@ -184,9 +184,9 @@ void initMotorControl(void) {
   PWMOutputState(PWM0_BASE, (PWM_OUT_0_BIT | PWM_OUT_1_BIT), true);
 
   // digital outputs to enable the driver boards
-  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
-  GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0); // D0 for module 0
-  GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_1); // D1 for module 1
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+  GPIOPinTypeGPIOOutput(GPIO_PORTE_BASE, GPIO_PIN_1); // E1 for module 0
+  GPIOPinTypeGPIOOutput(GPIO_PORTE_BASE, GPIO_PIN_2); // E2 for module 1
 
 }
 
@@ -224,8 +224,8 @@ main(void)
 
     // Initialize the PWM module and digitial outputs
     initMotorControl();
-    GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_0, GPIO_PIN_0);
-    GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_1, GPIO_PIN_1);
+    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
+    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
