@@ -1,24 +1,9 @@
 //*****************************************************************************
 //
-// hello.c - Simple hello world example.
+// Simple controller for a 1-DOF master-slave teleoperation system
 //
-// Copyright (c) 2012-2017 Texas Instruments Incorporated.  All rights reserved.
-// Software License Agreement
-//
-// Texas Instruments (TI) is supplying this software for use solely and
-// exclusively on TI's microcontroller products. The software is owned by
-// TI and/or its suppliers, and is protected under applicable copyright
-// laws. You may not combine this software with "viral" open-source
-// software in order to form a larger program.
-//
-// THIS SOFTWARE IS PROVIDED "AS IS" AND WITH ALL FAULTS.
-// NO WARRANTIES, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT
-// NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. TI SHALL NOT, UNDER ANY
-// CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
-// DAMAGES, FOR ANY REASON WHATSOEVER.
-//
-// This is part of revision 2.1.4.178 of the EK-TM4C123GXL Firmware Package.
+// Uses a Tiva TM4C123G Launchpad Evaluation Board
+// 2 QEI modules, 1 timer, 2 PWM outputs, 1 UART port
 //
 //*****************************************************************************
 
@@ -42,25 +27,7 @@
 #include "driverlib/pwm.h"
 #include "utils/uartstdio.h"
 
-
-//*****************************************************************************
-//
-//! \addtogroup example_list
-//! <h1>Hello World (hello)</h1>
-//!
-//! A very simple ``hello world'' example.  It simply displays ``Hello World!''
-//! on the UART and is a starting point for more complicated applications.
-//!
-//! UART0, connected to the Virtual Serial Port and running at
-//! 115,200, 8-N-1, is used to display messages from this application.
-//
-//*****************************************************************************
-
-//*****************************************************************************
-//
 // The error routine that is called if the driver library encounters an error.
-//
-//*****************************************************************************
 #ifdef DEBUG
 void
 __error__(char *pcFilename, uint32_t ui32Line)
@@ -70,40 +37,26 @@ __error__(char *pcFilename, uint32_t ui32Line)
 
 static volatile int controller_flag = 0;
 
-//*****************************************************************************
-//
 // Configure the UART and its pins.  This must be called before UARTprintf().
-//
-//*****************************************************************************
 void
 ConfigureUART(void)
 {
-    //
     // Enable the GPIO Peripheral used by the UART.
-    //
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
 
-    //
     // Enable UART0
-    //
     SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
 
-    //
-    // Configure GPIO Pins for UART mode.
-    //
+    // Configure GPIO Pins for UART mode
     GPIOPinConfigure(GPIO_PA0_U0RX);
     GPIOPinConfigure(GPIO_PA1_U0TX);
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 
-    //
-    // Use the internal 16MHz oscillator as the UART clock source.
-    //
+    // Use the internal 16MHz oscillator as the UART clock source
     UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
 
-    //
-    // Initialize the UART for console I/O.
-    //
-    UARTStdioConfig(0, 460800, 16000000);
+    // Initialize the UART for console I/O
+    UARTStdioConfig(0, 460800, 16000000); // baud rate of 460800
 }
 
 // Set up encoder modules
@@ -131,7 +84,7 @@ void ConfigureQEI0(void) {
 	QEIDisable(QEI0_BASE);
 	QEIIntDisable(QEI0_BASE,QEI_INTERROR | QEI_INTDIR | QEI_INTTIMER | QEI_INTINDEX);
 
-	// Configure quadrature encoder, use an arbitrary top limit of 1000
+	// Configure quadrature encoder
 	QEIConfigure(QEI0_BASE, (QEI_CONFIG_CAPTURE_A_B  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 8191);
   QEIVelocityConfigure(QEI0_BASE, QEI_VELDIV_1, 500000);
 
@@ -156,14 +109,14 @@ void ConfigureQEI1(void) {
 
   // from "https://forum.43oh.com/topic/7170-using-harware-qei-on-tiva-launchpad/":
 
-  //Set GPIO pins for QEI. PhA0 -> PD6, PhB0 ->PD7. I believe this sets the pull up and makes them inputs
+  //Set GPIO pins for QEI. PhA1 -> PC5, PhB1 ->PC6. I believe this sets the pull up and makes them inputs
 	GPIOPinTypeQEI(GPIO_PORTC_BASE, GPIO_PIN_5 |  GPIO_PIN_6);
 
 	//DISable peripheral and int before configuration
 	QEIDisable(QEI1_BASE);
 	QEIIntDisable(QEI1_BASE,QEI_INTERROR | QEI_INTDIR | QEI_INTTIMER | QEI_INTINDEX);
 
-	// Configure quadrature encoder, use an arbitrary top limit of 1000
+	// Configure quadrature encoder
 	QEIConfigure(QEI1_BASE, (QEI_CONFIG_CAPTURE_A_B  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 8191);
   QEIVelocityConfigure(QEI1_BASE, QEI_VELDIV_1, 500000);
 
@@ -234,40 +187,25 @@ void initMotorControl(void) {
 
 }
 
-//*****************************************************************************
-//
+
 // Main control loop that checks for the timer interrupt flag and determines the
 // new control efforts based on encoder measurements
-//
-//*****************************************************************************
-
-
 int
 main(void)
 {
-    //volatile uint32_t ui32Loop;
-
-    //
     // Enable lazy stacking for interrupt handlers.  This allows floating-point
     // instructions to be used within interrupt handlers, but at the expense of
     // extra stack usage.
-    //
     FPULazyStackingEnable();
 
-    //
-    // Set the clocking to run directly from the crystal.
-    //
+    // Set the clocking to run directly from the crystal
     SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ |
                        SYSCTL_OSC_MAIN);
 
-    //
-    // Enable the GPIO port that is used for the on-board LED.
-    //
+    // Enable the GPIO port that is used for the on-board LED
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 
-    //
     // Enable the GPIO pins for the LED (PF2 & PF3).
-    //
     GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_2);
     GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3);
 
@@ -317,7 +255,7 @@ main(void)
           Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
-          // Calculate control efforts
+          // Calculate control efforts, placing limits on values based on PWM period
           U0 = 1600 + (k*(Pos1-Pos0)) + (b*(Vel1-Vel0));
           U1 = 1600 + (k*(Pos0-Pos1)) + (b*(Vel0-Vel1));
 
@@ -327,11 +265,11 @@ main(void)
           if (U1 < 1) { U1 = 1; }
           if (U1 > 3199) { U1 = 3199; }
 
-          // set new PWM values here
-          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0); // starting PWM duty cycles
+          // set new PWM values
+          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
-          // transmit data (printing takes about 3ms -> max frequency around 300 Hz)
+          // transmit data
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of transmission separate from control calculations
           before = TimerValueGet(TIMER0_BASE, TIMER_A);
           UARTprintf("%u, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1, transmit_time);
