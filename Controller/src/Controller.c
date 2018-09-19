@@ -232,15 +232,19 @@ main(void)
     unsigned int LastPos1 = 0;
     int PosDiff = 0;
     int PosDiffTemp = 0;
+    int PosDiffFilt = 0;
 
     int Vel0 = 0;
     int Vel1 = 0;
+    int VelDiff = 0;
+    int VelDiffTemp = 0;
+    int VelDiffFilt = 0;
 
     int U0 = 0;
     int U1 = 0;
 
-    int k = 50;
-    int b = 100;
+    int k = 20;
+    int b = 10;
 
     //int before = 0;
     //int after = 0;
@@ -264,6 +268,7 @@ main(void)
 
           // Calculate control efforts, placing limits on values based on PWM period
           PosDiff = PosDiff + (Pos1-LastPos1) - (Pos0-LastPos0); // calculate difference with 0 wrapping
+          PosDiffFilt = ((3*PosDiffFilt) + PosDiff) / 4; // filter the positions
           LastPos0 = Pos0;
           LastPos1 = Pos1;
           //if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
@@ -271,8 +276,15 @@ main(void)
 
           if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           else { PosDiffTemp = PosDiff; }
-          U0 = 5000 - (k*(PosDiffTemp)) - (b*(Vel1-Vel0));
-          U1 = 5000 + (k*(PosDiffTemp)) + (b*(Vel1-Vel0));
+
+          VelDiff = Vel1-Vel0;
+          VelDiffFilt = ((9*VelDiffFilt) + VelDiff) / 10;
+
+          if ((VelDiffFilt<25) & (VelDiffFilt>-25)) { VelDiffTemp = 0; }
+          else { VelDiffTemp = VelDiffFilt; }
+
+          U0 = 5000 - (k*(PosDiffTemp)) - (b*VelDiffTemp);
+          U1 = 5000 + (k*(PosDiffTemp)) + (b*VelDiffTemp);
 
           if (U0 < 1500) { U0 = 1500; } // limit to 15% and 85% for driver modules
           if (U0 > 8500) { U0 = 8500; }
