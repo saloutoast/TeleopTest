@@ -3,7 +3,7 @@
 // Simple controller for a 1-DOF master-slave teleoperation system
 //
 // Uses a Tiva TM4C123G Launchpad Evaluation Board
-// 2 QEI modules, 1 timer, 2 PWM outputs, 1 UART port
+// 2 QEI modules, 1 timer, 2 PWM outputs, 2, digital outputs, 2 analog inputs, 1 UART port
 //
 //*****************************************************************************
 
@@ -304,11 +304,11 @@ main(void)
           U0 = 5000 - (k*(PosDiffTemp)) - (b*VelDiffTemp);
           U1 = 5000 + (k*(PosDiffTemp)) + (b*VelDiffTemp);
 
-          if (U0 < 1500) { U0 = 1500; } // limit to 15% and 85% for driver modules
-          if (U0 > 8500) { U0 = 8500; }
+          if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
+          if (U0 > 8990) { U0 = 8990; }
 
-          if (U1 < 1500) { U1 = 1500; }
-          if (U1 > 8500) { U1 = 8500; }
+          if (U1 < 1010) { U1 = 1010; }
+          if (U1 > 8990) { U1 = 8990; }
 
           // set new PWM values
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
@@ -327,7 +327,7 @@ main(void)
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
-          //UARTprintf("%d, %d\n", I0_raw, I1_raw);
+          //UARTprintf("%d, %d\n", I0_raw, I1_raw); // only return currents
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
