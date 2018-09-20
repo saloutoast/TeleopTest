@@ -25,6 +25,7 @@
 #include "driverlib/interrupt.h"
 #include "driverlib/timer.h"
 #include "driverlib/pwm.h"
+#include "driverlib/adc.h"
 #include "utils/uartstdio.h"
 
 // The error routine that is called if the driver library encounters an error.
@@ -186,6 +187,16 @@ void initMotorControl(void) {
   GPIOPinTypeGPIOOutput(GPIO_PORTE_BASE, GPIO_PIN_1); // E1 for module 0
   GPIOPinTypeGPIOOutput(GPIO_PORTE_BASE, GPIO_PIN_2); // E2 for module 1
 
+  // analog inputs for actual motor current
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+  GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4); // set up AIN9 for motor 0
+  GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_5); // set up AIN8 for motor 1
+  ADCSequenceDisable(ADC0_BASE, 1); // start config for sequence 1
+  ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+  ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_CH8);
+  ADCSequenceStepConfigure(ADC0_BASE, 1, 1, ADC_CTL_CH9 |  ADC_CTL_IE | ADC_CTL_END );
+  ADCSequenceEnable(ADC0_BASE, 1);
+  ADCIntClear(ADC0_BASE, 1);
 }
 
 
@@ -217,13 +228,8 @@ main(void)
     ConfigureQEI0();
     ConfigureQEI1();
 
-    // Initialize timer for controller interrupts
-    initTimer();
-
     // Initialize the PWM module and digitial outputs
     initMotorControl();
-    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
-    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
@@ -246,9 +252,22 @@ main(void)
     int k = 20;
     int b = 10;
 
+    // values for ADC
+    unsigned long ADCvals[4];
+    long I0_raw = 0; // unconverted current values (still digital)
+    long I1_raw = 0;
+
     //int before = 0;
     //int after = 0;
-    //int transmit_time = 0;
+    //int clock_time = 0;
+
+
+    // Initialize timer for controller interrupts
+    initTimer();
+
+    // enable motor drivers just before entering control loop
+    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
+    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     while(1)
     {
@@ -257,7 +276,6 @@ main(void)
 
           // Turn on the LED. Can scope these pins for interrupt execution timing
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
-
 
           // Get position and velocity values
           Pos0 = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
@@ -296,16 +314,26 @@ main(void)
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
+          // sample motor current from analog inputs
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of sampling
+          ADCIntClear(ADC0_BASE, 1);
+          ADCProcessorTrigger(ADC0_BASE, 1);
+          while(!ADCIntStatus(ADC0_BASE, 1, false)) {} // wait for sampling to finish
+          ADCSequenceDataGet(ADC0_BASE, 1, ADCvals); // retrieve data from ADC FIFO buffer
+          I0_raw = ADCvals[1]; // raw current value for motor 0
+          I1_raw = ADCvals[0]; // raw current value for motor 1
+          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
+
           // transmit data
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of transmission separate from control calculations
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%u, %d, %d, %u, %d, %d\n", Pos0, Vel0, U0, Pos1, Vel1, U1);
+          UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
+          //UARTprintf("%d, %d\n", I0_raw, I1_raw);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
           // Turn off the LED.
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+
 
           // Reset controller flag for next interrupt
           controller_flag = 0;
