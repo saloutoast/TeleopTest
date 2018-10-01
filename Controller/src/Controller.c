@@ -292,7 +292,7 @@ main(void)
           //if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
           //if ((Pos0<2048) & (Pos1>6144)) { PosDiff = Pos0 + 8192 - Pos1; }
 
-          if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
+          /* if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           else { PosDiffTemp = PosDiff; }
 
           VelDiff = Vel1-Vel0;
@@ -308,7 +308,10 @@ main(void)
           if (U0 > 8990) { U0 = 8990; }
 
           if (U1 < 1010) { U1 = 1010; }
-          if (U1 > 8990) { U1 = 8990; }
+          if (U1 > 8990) { U1 = 8990; } */
+
+          U0 = 5000; // to test motor performance
+          U1 = 5000;
 
           // set new PWM values
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
