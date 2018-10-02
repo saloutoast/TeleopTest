@@ -236,6 +236,8 @@ main(void)
     unsigned int LastPos0 = 0;
     unsigned int Pos1 = 0;
     unsigned int LastPos1 = 0;
+    int DelPos0 = 0;
+    int DelPos1 = 0;
     int PosDiff = 0;
     int PosDiffTemp = 0;
     int PosDiffFilt = 0;
@@ -249,8 +251,8 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 20;
-    int b = 10;
+    int k = 5;
+    int b = 1;
 
     // values for ADC
     unsigned long ADCvals[4];
@@ -260,7 +262,6 @@ main(void)
     //int before = 0;
     //int after = 0;
     //int clock_time = 0;
-
 
     // Initialize timer for controller interrupts
     initTimer();
@@ -285,21 +286,27 @@ main(void)
           Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
-          PosDiff = PosDiff + (Pos1-LastPos1) - (Pos0-LastPos0); // calculate difference with 0 wrapping
+          DelPos0 = Pos0 - LastPos0;
+          if (DelPos0<-6144) { DelPos0 = DelPos0 + 8192; }
+          if (DelPos0>6144)  { DelPos0 = DelPos0 - 8192; }
+          DelPos1 = Pos1 - LastPos1;
+          if (DelPos1<-6144) { DelPos1 = DelPos1 + 8192; }
+          if (DelPos1>6144)  { DelPos1 = DelPos1 - 8192; }
+          PosDiff = PosDiff + DelPos1 - DelPos0; // calculate difference with 0 wrapping
           PosDiffFilt = ((3*PosDiffFilt) + PosDiff) / 4; // filter the positions
           LastPos0 = Pos0;
           LastPos1 = Pos1;
-          //if ((Pos1<2048) & (Pos0>6144)) { PosDiff = Pos1 + 8192 - Pos0; }
-          //if ((Pos0<2048) & (Pos1>6144)) { PosDiff = Pos0 + 8192 - Pos1; }
 
-          /* if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
+          if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           else { PosDiffTemp = PosDiff; }
+          //PosDiffTemp = PosDiff;
 
           VelDiff = Vel1-Vel0;
           VelDiffFilt = ((9*VelDiffFilt) + VelDiff) / 10;
 
           if ((VelDiffFilt<25) & (VelDiffFilt>-25)) { VelDiffTemp = 0; }
           else { VelDiffTemp = VelDiffFilt; }
+          //VelDiffTemp = VelDiff;
 
           U0 = 5000 - (k*(PosDiffTemp)) - (b*VelDiffTemp);
           U1 = 5000 + (k*(PosDiffTemp)) + (b*VelDiffTemp);
@@ -308,10 +315,7 @@ main(void)
           if (U0 > 8990) { U0 = 8990; }
 
           if (U1 < 1010) { U1 = 1010; }
-          if (U1 > 8990) { U1 = 8990; } */
-
-          U0 = 5000; // to test motor performance
-          U1 = 5000;
+          if (U1 > 8990) { U1 = 8990; }
 
           // set new PWM values
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
@@ -329,8 +333,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
-          UARTprintf("%u, %d, %u, %d\n", Pos0, Vel0, Pos1, Vel1); // only return currents
+          UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
+          //UARTprintf("%u, %d, %u, %d\n", Pos0, Vel0, Pos1, Vel1); // only return some data
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
