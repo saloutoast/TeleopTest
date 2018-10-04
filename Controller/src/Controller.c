@@ -192,6 +192,7 @@ void initMotorControl(void) {
   GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4); // set up AIN9 for motor 0
   GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_5); // set up AIN8 for motor 1
   ADCSequenceDisable(ADC0_BASE, 1); // start config for sequence 1
+  ADCReferenceSet(ADC0_BASE, ADC_REF_INT); // from "http://e2e.ti.com/support/microcontrollers/other_microcontrollers/f/908/t/301210" to fix saturation problem?
   ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
   ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_CH8);
   ADCSequenceStepConfigure(ADC0_BASE, 1, 1, ADC_CTL_CH9 |  ADC_CTL_IE | ADC_CTL_END );
