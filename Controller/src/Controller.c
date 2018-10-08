@@ -87,7 +87,7 @@ void ConfigureQEI0(void) {
 
 	// Configure quadrature encoder
 	QEIConfigure(QEI0_BASE, (QEI_CONFIG_CAPTURE_A_B  | QEI_CONFIG_NO_RESET 	| QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP), 8191);
-  QEIVelocityConfigure(QEI0_BASE, QEI_VELDIV_1, 500000);
+  QEIVelocityConfigure(QEI0_BASE, QEI_VELDIV_1, 16000);
 
 	// Enable the quadrature encoder.
 	QEIEnable(QEI0_BASE);
@@ -252,17 +252,23 @@ main(void)
     int U0 = 0;
     int U1 = 0;
 
-    int k = 5;
-    int b = 1;
-
     // values for ADC
     unsigned long ADCvals[4];
     long I0_raw = 0; // unconverted current values (still digital)
     long I1_raw = 0;
 
+    // scaled values
+    long ScaledPosDiff = 0;
+    long ScaledVelDiff = 0;
+
+
     //int before = 0;
     //int after = 0;
     //int clock_time = 0;
+
+    // CONTROLLER GAINS
+    int k = 100;
+    int b = 25;
 
     // Initialize timer for controller interrupts
     initTimer();
@@ -283,8 +289,8 @@ main(void)
           Pos0 = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
           Pos1 = QEIPositionGet(QEI1_BASE);
 
-          Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
-          Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
+          //Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
+          //Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
           DelPos0 = Pos0 - LastPos0;
@@ -298,19 +304,25 @@ main(void)
           LastPos0 = Pos0;
           LastPos1 = Pos1;
 
-          if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
-          else { PosDiffTemp = PosDiff; }
-          //PosDiffTemp = PosDiff;
+          Vel0 = DelPos0; // don't use QEI for velocities, remove scaling by time step
+          Vel1 = DelPos1; // scale by 1000/23 to get degrees per second
+
+          //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
+          //else { PosDiffTemp = PosDiff; }
+          PosDiffTemp = PosDiff;
 
           VelDiff = Vel1-Vel0;
           VelDiffFilt = ((9*VelDiffFilt) + VelDiff) / 10;
 
-          if ((VelDiffFilt<25) & (VelDiffFilt>-25)) { VelDiffTemp = 0; }
+          if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
           else { VelDiffTemp = VelDiffFilt; }
           //VelDiffTemp = VelDiff;
 
-          U0 = 5000 - (k*(PosDiffTemp)) - (b*VelDiffTemp);
-          U1 = 5000 + (k*(PosDiffTemp)) + (b*VelDiffTemp);
+          ScaledPosDiff = PosDiffTemp/23;
+          ScaledVelDiff = (VelDiffTemp*1000)/23;
+
+          U0 = 5000 - (k*(ScaledPosDiff)); // - (b*ScaledVelDiff);
+          U1 = 5000 + (k*(ScaledPosDiff)); // + (b*ScaledVelDiff);
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -332,7 +344,8 @@ main(void)
           I1_raw = ADCvals[0]; // raw current value for motor 1
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
 
-          // transmit data
+          // transmit data.
+
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
           //UARTprintf("%u, %d, %u, %d\n", Pos0, Vel0, Pos1, Vel1); // only return some data
