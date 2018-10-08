@@ -268,7 +268,7 @@ main(void)
 
     // CONTROLLER GAINS
     int k = 100;
-    int b = 25;
+    int b = 35;
 
     // Initialize timer for controller interrupts
     initTimer();
@@ -309,20 +309,20 @@ main(void)
 
           //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           //else { PosDiffTemp = PosDiff; }
-          PosDiffTemp = PosDiff;
+          PosDiffTemp = PosDiff; // no deadzone for position
 
           VelDiff = Vel1-Vel0;
           VelDiffFilt = ((9*VelDiffFilt) + VelDiff) / 10;
 
-          if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
-          else { VelDiffTemp = VelDiffFilt; }
-          //VelDiffTemp = VelDiff;
+          //if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
+          //else { VelDiffTemp = VelDiffFilt; }
+          VelDiffTemp = VelDiff; // no deadzone for velocity
 
-          ScaledPosDiff = PosDiffTemp/23;
-          ScaledVelDiff = (VelDiffTemp*1000)/23;
+          ScaledPosDiff = PosDiffTemp/23; // approximately in deg
+          ScaledVelDiff = (VelDiffTemp*1000)/23/57; // approximately in rad/second
 
-          U0 = 5000 - (k*(ScaledPosDiff)); // - (b*ScaledVelDiff);
-          U1 = 5000 + (k*(ScaledPosDiff)); // + (b*ScaledVelDiff);
+          U0 = 5000 - (k*(ScaledPosDiff)) - (b*ScaledVelDiff);
+          U1 = 5000 + (k*(ScaledPosDiff)) + (b*ScaledVelDiff);
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -348,7 +348,7 @@ main(void)
 
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
-          //UARTprintf("%u, %d, %u, %d\n", Pos0, Vel0, Pos1, Vel1); // only return some data
+          //UARTprintf("%d, %d\n", ScaledPosDiff, ScaledVelDiff); // only return some data
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
