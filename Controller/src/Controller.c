@@ -321,6 +321,28 @@ main(void)
           ScaledPosDiff = PosDiffTemp/23; // approximately in deg
           ScaledVelDiff = (VelDiffTemp*1000)/23/57; // approximately in rad/second
 
+          // SSI from matlab code:
+
+          /*% calculate control currents, saturated at idmax
+          id_temp = (-Kp*((theta(1,tt-1)-theta(3,tt-1))*(180/pi))-(Kd*(theta(2,tt-1)-theta(4,tt-1))))*(imax/4000);
+    
+          % SSI code (1 is master, 0 is slave)
+          xmax = (theta(3,tt-1)-theta(1,tt-1))*(180/pi);
+          fmax = controls(2,tt-1)*kt;
+
+          Eout = step*((Kp*xmax)+SSI_vals(tt-1))*(theta(4,tt-1)-theta(2,tt-1));
+          if ( xmax > 0) % master ahead of slave
+            delO = -(2/xmax)*(Eout - (xmax*fmax*0.5)); % positive
+          else % slave ahead of master
+            delO = (2/xmax)*(Eout - (xmax*fmax*0.5)); % negative
+          end
+
+          SSI_vals(tt) = delO;
+          id = max(min( (id_temp+(SSI*delO)) ,imax),-imax);
+          controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)]; */
+
+          // TODO: implement SSI on TIVA here
+
           U0 = 5000 - (k*(ScaledPosDiff)) - (b*ScaledVelDiff);
           U1 = 5000 + (k*(ScaledPosDiff)) + (b*ScaledVelDiff);
 
