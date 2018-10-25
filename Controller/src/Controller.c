@@ -266,8 +266,14 @@ main(void)
     //int after = 0;
     //int clock_time = 0;
 
+    // SSI values
+    long Eout = 0;
+    long Fslave = 0;
+    long delO = 0;
+    int SSI_flag = 0; // flag for whether SSI is activated
+
     // CONTROLLER GAINS
-    int k = 100;
+    int k = 1000;
     int b = 35;
 
     // Initialize timer for controller interrupts
@@ -325,7 +331,7 @@ main(void)
 
           /*% calculate control currents, saturated at idmax
           id_temp = (-Kp*((theta(1,tt-1)-theta(3,tt-1))*(180/pi))-(Kd*(theta(2,tt-1)-theta(4,tt-1))))*(imax/4000);
-    
+
           % SSI code (1 is master, 0 is slave)
           xmax = (theta(3,tt-1)-theta(1,tt-1))*(180/pi);
           fmax = controls(2,tt-1)*kt;
@@ -342,9 +348,20 @@ main(void)
           controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)]; */
 
           // TODO: implement SSI on TIVA here
+          if (SSI_flag==1) {
+            Eout = ((4000*k*ScaledPosDiff) + (delO*ScaledVelDiff)) / 1000;
+            Fslave = (U0-5000)/5; // last current * kt
+            if (ScaledPosDiff>0) {
+              delO = (-2 * (Eout - (ScaledPosDiff*Fslave/2)))/ScaledPosDiff;
+            } else {
+              delO = (2 * (Eout - (ScaledPosDiff*Fslave/2)))/ScaledPosDiff;
+            }
+          } else {
+            delO = 0;
+          }
 
-          U0 = 5000 - (k*(ScaledPosDiff)) - (b*ScaledVelDiff);
-          U1 = 5000 + (k*(ScaledPosDiff)) + (b*ScaledVelDiff);
+          U0 = 5000 - (k*(ScaledPosDiff)) - (b*ScaledVelDiff) - delO;
+          U1 = 5000 + (k*(ScaledPosDiff)) + (b*ScaledVelDiff) + delO;
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -369,7 +386,7 @@ main(void)
           // transmit data.
 
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw);
+          UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d\n", ScaledPosDiff, ScaledVelDiff); // only return some data
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
