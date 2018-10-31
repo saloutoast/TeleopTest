@@ -35,6 +35,7 @@ LD_SCRIPT = $(MCU).ld
 # define flags
 CFLAGS = -g -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 # commented out: floating point flag
+CFLAGS += -fsingle-precision-constant
 # CFLAGS = -g -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
 CFLAGS +=-Os -ffunction-sections -fdata-sections -MD -std=c99 -Wall
 CFLAGS += -pedantic -DPART_$(MCU) -c -I$(TIVAWARE_PATH) -I$(INCDIR)
@@ -66,7 +67,7 @@ $(OUTDIR)/%.o: src/%.c | $(OUTDIR)
 	$(CC) -o $@ $^ $(CFLAGS)
 
 $(OUTDIR)/a.out: $(OBJECTS)
-	$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS) -L/home/andrew/Embedded/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/lib/armv7e-m/fpu -lm
 
 $(OUTDIR)/main.bin: $(OUTDIR)/a.out
 	$(OBJCOPY) -O binary $< $@

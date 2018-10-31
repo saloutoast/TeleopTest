@@ -10,10 +10,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
+
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
 #include "inc/hw_gpio.h"
 #include "inc/hw_ints.h"
+
 #include "driverlib/debug.h"
 #include "driverlib/fpu.h"
 #include "driverlib/gpio.h"
@@ -26,6 +29,8 @@
 #include "driverlib/timer.h"
 #include "driverlib/pwm.h"
 #include "driverlib/adc.h"
+#include "driverlib/fpu.h"
+
 #include "utils/uartstdio.h"
 
 // The error routine that is called if the driver library encounters an error.
@@ -35,6 +40,9 @@ __error__(char *pcFilename, uint32_t ui32Line)
 {
 }
 #endif
+
+// define PI to test fpu
+#define M_PI 3.14159265358979323846
 
 static volatile int controller_flag = 0;
 
@@ -210,6 +218,7 @@ main(void)
     // instructions to be used within interrupt handlers, but at the expense of
     // extra stack usage.
     FPULazyStackingEnable();
+    FPUEnable();
 
     // Set the clocking to run directly from the crystal
     SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ |
@@ -231,6 +240,8 @@ main(void)
 
     // Initialize the PWM module and digitial outputs
     initMotorControl();
+
+    /*
 
     // Initialize the controller variables
     unsigned int Pos0 = 0;
@@ -276,6 +287,8 @@ main(void)
     int k = 1000;
     int b = 35;
 
+    */
+
     // Initialize timer for controller interrupts
     initTimer();
 
@@ -283,10 +296,25 @@ main(void)
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
+    // floats for testing
+    uint16_t ii=0;
+    volatile float fRadians = (2*(float)M_PI)/10000;
+    volatile float sinRadians = 0.0f;
+
     while(1)
     {
         // main controller to execute after each timer interrupt
         if (controller_flag==1) {
+
+          sinRadians = sinf(fRadians * ii);
+          ii++;
+          if (ii%500 == 0) {
+            //UARTprintf("%d\n", sinRadians);
+            UARTprintf("%d\n", (int)(sinRadians*1000));
+            //sinRadians = sinRadians + 2.5f;
+          }
+
+          /*
 
           // Turn on the LED. Can scope these pins for interrupt execution timing
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
@@ -329,23 +357,23 @@ main(void)
 
           // SSI from matlab code:
 
-          /*% calculate control currents, saturated at idmax
-          id_temp = (-Kp*((theta(1,tt-1)-theta(3,tt-1))*(180/pi))-(Kd*(theta(2,tt-1)-theta(4,tt-1))))*(imax/4000);
-
-          % SSI code (1 is master, 0 is slave)
-          xmax = (theta(3,tt-1)-theta(1,tt-1))*(180/pi);
-          fmax = controls(2,tt-1)*kt;
-
-          Eout = step*((Kp*xmax)+SSI_vals(tt-1))*(theta(4,tt-1)-theta(2,tt-1));
-          if ( xmax > 0) % master ahead of slave
-            delO = -(2/xmax)*(Eout - (xmax*fmax*0.5)); % positive
-          else % slave ahead of master
-            delO = (2/xmax)*(Eout - (xmax*fmax*0.5)); % negative
-          end
-
-          SSI_vals(tt) = delO;
-          id = max(min( (id_temp+(SSI*delO)) ,imax),-imax);
-          controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)]; */
+          //% calculate control currents, saturated at idmax
+          //id_temp = (-Kp*((theta(1,tt-1)-theta(3,tt-1))*(180/pi))-(Kd*(theta(2,tt-1)-theta(4,tt-1))))*(imax/4000);
+          //
+          //% SSI code (1 is master, 0 is slave)
+          //xmax = (theta(3,tt-1)-theta(1,tt-1))*(180/pi);
+          //fmax = controls(2,tt-1)*kt;
+          //
+          //Eout = step*((Kp*xmax)+SSI_vals(tt-1))*(theta(4,tt-1)-theta(2,tt-1));
+          //if ( xmax > 0) % master ahead of slave
+          //  delO = -(2/xmax)*(Eout - (xmax*fmax*0.5)); % positive
+          //else % slave ahead of master
+          //  delO = (2/xmax)*(Eout - (xmax*fmax*0.5)); % negative
+          //end
+          //
+          //SSI_vals(tt) = delO;
+          //id = max(min( (id_temp+(SSI*delO)) ,imax),-imax);
+          //controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)];
 
           // TODO: implement SSI on TIVA here
           if (SSI_flag==1) {
@@ -383,10 +411,12 @@ main(void)
           I1_raw = ADCvals[0]; // raw current value for motor 1
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
 
+          */
+
           // transmit data.
 
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
+          //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d\n", ScaledPosDiff, ScaledVelDiff); // only return some data
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
