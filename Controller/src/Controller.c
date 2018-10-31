@@ -211,8 +211,15 @@ void initMotorControl(void) {
 }
 
 // function to calculate tuning parameter
-float calculate_alpha(float a, float b) {
-  return a+b;
+float calculate_alpha(float delx, float delv, float T0, float T1) {
+  float alpha = 0.0;
+
+  // example linear transition, shouldn't actually be based on delx
+  if (delx>200.0) { alpha = 1.0; }
+  else if (delx<-200.0) { alpha = 0.0; }
+  else { alpha = 0.5 + (delx/400.0); }
+
+  return alpha;
 }
 
 
