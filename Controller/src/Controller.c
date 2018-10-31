@@ -42,7 +42,9 @@ __error__(char *pcFilename, uint32_t ui32Line)
 #endif
 
 // define PI to test fpu
+#ifndef M_PI
 #define M_PI 3.14159265358979323846
+#endif
 
 static volatile int controller_flag = 0;
 
@@ -208,6 +210,11 @@ void initMotorControl(void) {
   ADCIntClear(ADC0_BASE, 1);
 }
 
+// function to calculate tuning parameter
+float calculate_alpha(float a, float b) {
+  return a+b;
+}
+
 
 // Main control loop that checks for the timer interrupt flag and determines the
 // new control efforts based on encoder measurements
@@ -241,8 +248,6 @@ main(void)
     // Initialize the PWM module and digitial outputs
     initMotorControl();
 
-    /*
-
     // Initialize the controller variables
     unsigned int Pos0 = 0;
     unsigned int LastPos0 = 0;
@@ -252,16 +257,16 @@ main(void)
     int DelPos1 = 0;
     int PosDiff = 0;
     int PosDiffTemp = 0;
-    int PosDiffFilt = 0;
+    //int PosDiffFilt = 0;
 
-    int Vel0 = 0;
-    int Vel1 = 0;
-    int VelDiff = 0;
-    int VelDiffTemp = 0;
-    int VelDiffFilt = 0;
+    float Vel0 = 0;
+    float Vel1 = 0;
+    float VelDiff = 0;
+    float VelDiffTemp = 0;
+    float VelDiffFilt = 0;
 
-    int U0 = 0;
-    int U1 = 0;
+    int U0 = 5000;
+    int U1 = 5000;
 
     // values for ADC
     unsigned long ADCvals[4];
@@ -269,25 +274,30 @@ main(void)
     long I1_raw = 0;
 
     // scaled values
-    long ScaledPosDiff = 0;
-    long ScaledVelDiff = 0;
-
+    float ScaledPosDiff = 0;
+    float ScaledVelDiff = 0;
 
     //int before = 0;
     //int after = 0;
     //int clock_time = 0;
 
     // SSI values
-    long Eout = 0;
-    long Fslave = 0;
-    long delO = 0;
-    int SSI_flag = 0; // flag for whether SSI is activated
+    //long Eout = 0;
+    //long Fslave = 0;
+    //long delO = 0;
+    //int SSI_flag = 0; // flag for whether SSI is activated
 
-    // CONTROLLER GAINS
-    int k = 1000;
-    int b = 35;
+    // controller values
+    float Kp_free = 1.0;
+    float Kp_contact = 1000.0;
+    float Kd = 1.0;
+    float Imax = 3.0;
+    float Id = 0.0;
+    float alpha = 0.0;
 
-    */
+    float kt = 19.4; // torque constant in mNm/A
+    float T0 = 0.0;
+    float T1 = 0.0;
 
     // Initialize timer for controller interrupts
     initTimer();
@@ -297,24 +307,20 @@ main(void)
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     // floats for testing
-    uint16_t ii=0;
-    volatile float fRadians = (2*(float)M_PI)/10000;
-    volatile float sinRadians = 0.0f;
+    //float fRadians = (2.0*M_PI)/10000.0;
+    //float sinRadians = 0.0;
 
     while(1)
     {
         // main controller to execute after each timer interrupt
         if (controller_flag==1) {
 
-          sinRadians = sinf(fRadians * ii);
-          ii++;
-          if (ii%500 == 0) {
-            //UARTprintf("%d\n", sinRadians);
+          /* ii++;
+          if (ii%100 == 0) {
+            sinRadians = sinf(fRadians * ii);
             UARTprintf("%d\n", (int)(sinRadians*1000));
             //sinRadians = sinRadians + 2.5f;
-          }
-
-          /*
+          } */
 
           // Turn on the LED. Can scope these pins for interrupt execution timing
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
@@ -334,26 +340,26 @@ main(void)
           if (DelPos1<-6144) { DelPos1 = DelPos1 + 8192; }
           if (DelPos1>6144)  { DelPos1 = DelPos1 - 8192; }
           PosDiff = PosDiff + DelPos1 - DelPos0; // calculate difference with 0 wrapping
-          PosDiffFilt = ((3*PosDiffFilt) + PosDiff) / 4; // filter the positions
+          //PosDiffFilt = ((3*PosDiffFilt) + PosDiff) / 4; // filter the positions
           LastPos0 = Pos0;
           LastPos1 = Pos1;
 
-          Vel0 = DelPos0; // don't use QEI for velocities, remove scaling by time step
-          Vel1 = DelPos1; // scale by 1000/23 to get degrees per second
+          Vel0 = (float)DelPos0; // don't use QEI for velocities, remove scaling by time step
+          Vel1 = (float)DelPos1; // scale by 1000/23 to get degrees per second
 
           //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           //else { PosDiffTemp = PosDiff; }
           PosDiffTemp = PosDiff; // no deadzone for position
 
           VelDiff = Vel1-Vel0;
-          VelDiffFilt = ((9*VelDiffFilt) + VelDiff) / 10;
+          VelDiffFilt = ((9.0*VelDiffFilt) + VelDiff) / 10.0;
 
           //if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
           //else { VelDiffTemp = VelDiffFilt; }
-          VelDiffTemp = VelDiff; // no deadzone for velocity
+          VelDiffTemp = VelDiffFilt; // no deadzone for velocity
 
-          ScaledPosDiff = PosDiffTemp/23; // approximately in deg
-          ScaledVelDiff = (VelDiffTemp*1000)/23/57; // approximately in rad/second
+          ScaledPosDiff = (float)PosDiffTemp*(360.0/8.192); // in milli-deg
+          ScaledVelDiff = (float)VelDiffTemp*(1000.0)*(360.0/8.192); // approximately in milli-deg/second
 
           // SSI from matlab code:
 
@@ -375,6 +381,8 @@ main(void)
           //id = max(min( (id_temp+(SSI*delO)) ,imax),-imax);
           //controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)];
 
+          /*
+
           // TODO: implement SSI on TIVA here
           if (SSI_flag==1) {
             Eout = ((4000*k*ScaledPosDiff) + (delO*ScaledVelDiff)) / 1000;
@@ -388,8 +396,15 @@ main(void)
             delO = 0;
           }
 
-          U0 = 5000 - (k*(ScaledPosDiff)) - (b*ScaledVelDiff) - delO;
-          U1 = 5000 + (k*(ScaledPosDiff)) + (b*ScaledVelDiff) + delO;
+          */
+
+          // calculate desired current based on tuning parameter alpha and pos/rate difference
+          alpha = 1.0;
+          Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
+          //if (Id > Imax) { Id = Imax; } // saturation of control signal
+
+          U0 = 5000 - (int)(Id); //*(4000/Imax)); // - delO;
+          U1 = 5000 + (int)(Id); //*(4000/Imax)); // + delO;
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -411,13 +426,14 @@ main(void)
           I1_raw = ADCvals[0]; // raw current value for motor 1
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
 
-          */
+          // calculate motor torques (in mNm) based on currents
+          T0 = kt*((((float)I0_raw)-1000.0)/1000.0)*Imax;
+          T1 = kt*((((float)I1_raw)-1000.0)/1000.0)*Imax;
 
           // transmit data.
-
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
-          //UARTprintf("%d, %d\n", ScaledPosDiff, ScaledVelDiff); // only return some data
+          UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff), (int)(ScaledVelDiff)); // only return some data
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
