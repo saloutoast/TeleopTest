@@ -210,19 +210,6 @@ void initMotorControl(void) {
   ADCIntClear(ADC0_BASE, 1);
 }
 
-// function to calculate tuning parameter
-float calculate_alpha(float delx, float delv, float T0, float T1) {
-  float alpha = 0.0;
-
-  // example linear transition, shouldn't actually be based on delx
-  if (delx>200.0) { alpha = 1.0; }
-  else if (delx<-200.0) { alpha = 0.0; }
-  else { alpha = 0.5 + (delx/400.0); }
-
-  return alpha;
-}
-
-
 // Main control loop that checks for the timer interrupt flag and determines the
 // new control efforts based on encoder measurements
 int
@@ -268,6 +255,8 @@ main(void)
 
     float Vel0 = 0;
     float Vel1 = 0;
+    float VelOld0 = 0;
+    float VelOld1 = 0;
     float VelDiff = 0;
     float VelDiffTemp = 0;
     float VelDiffFilt = 0;
@@ -277,8 +266,8 @@ main(void)
 
     // values for ADC
     unsigned long ADCvals[4];
-    long I0_raw = 0; // unconverted current values (still digital)
-    long I1_raw = 0;
+    unsigned long I0_raw = 0; // unconverted current values (still digital)
+    unsigned long I1_raw = 0;
 
     // scaled values
     float ScaledPosDiff = 0;
@@ -295,16 +284,24 @@ main(void)
     //int SSI_flag = 0; // flag for whether SSI is activated
 
     // controller values
-    float Kp_free = 1.0;
-    float Kp_contact = 1000.0;
-    float Kd = 1.0;
-    float Imax = 3.0;
+    //float Kp_free = 10.0;
+    //float Kp_contact = 100.0;
+    float Kp_alpha = 0.0;
+    float Kd = 35.0;
+    float Imax = 1.5;
     float Id = 0.0;
     float alpha = 0.0;
+    int sw_val = 0;
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     float kt = 19.4; // torque constant in mNm/A
-    float T0 = 0.0;
-    float T1 = 0.0;
+    float J = 1.0; // motor and arm inertia
+    float Acc0 = 0.0;
+    float Acc1 = 0.0;
+    float Tm0 = 0.0;
+    float Tin0 = 0.0;
+    float Tm1 = 0.0;
+    float Tin1 = 0.0;
 
     // Initialize timer for controller interrupts
     initTimer();
@@ -313,21 +310,10 @@ main(void)
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
-    // floats for testing
-    //float fRadians = (2.0*M_PI)/10000.0;
-    //float sinRadians = 0.0;
-
     while(1)
     {
         // main controller to execute after each timer interrupt
         if (controller_flag==1) {
-
-          /* ii++;
-          if (ii%100 == 0) {
-            sinRadians = sinf(fRadians * ii);
-            UARTprintf("%d\n", (int)(sinRadians*1000));
-            //sinRadians = sinRadians + 2.5f;
-          } */
 
           // Turn on the LED. Can scope these pins for interrupt execution timing
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
@@ -351,8 +337,13 @@ main(void)
           LastPos0 = Pos0;
           LastPos1 = Pos1;
 
+          VelOld0 = Vel0;
+          VelOld1 = Vel1;
           Vel0 = (float)DelPos0; // don't use QEI for velocities, remove scaling by time step
           Vel1 = (float)DelPos1; // scale by 1000/23 to get degrees per second
+
+          Acc0 = (Vel0 - VelOld0)*(2*M_PI/8.192)*1000.0; // in rad/sec/sec
+          Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0;
 
           //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           //else { PosDiffTemp = PosDiff; }
@@ -365,8 +356,8 @@ main(void)
           //else { VelDiffTemp = VelDiffFilt; }
           VelDiffTemp = VelDiffFilt; // no deadzone for velocity
 
-          ScaledPosDiff = (float)PosDiffTemp*(360.0/8.192); // in milli-deg
-          ScaledVelDiff = (float)VelDiffTemp*(1000.0)*(360.0/8.192); // approximately in milli-deg/second
+          ScaledPosDiff = (float)PosDiffTemp*(360.0/8192.0); // in deg
+          ScaledVelDiff = (float)VelDiffTemp*(2*M_PI/8.192); // approximately in rad/sec
 
           // SSI from matlab code:
 
@@ -405,9 +396,24 @@ main(void)
 
           */
 
+
+
           // calculate desired current based on tuning parameter alpha and pos/rate difference
-          alpha = 1.0;
-          Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
+          sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
+          if (sw_val==0) {
+            alpha = 1.0;
+            Kp_alpha = 100.0; }
+          else {
+            alpha = 0.0;
+            Kp_alpha = Kp_alpha + 2.0; // integrate Kp during contact to a new max value
+            if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
+          }
+          //if (ScaledPosDiff>5.0) { alpha = 0.0; }
+          //else if (ScaledPosDiff<-5.0) { alpha = 0.0; }
+          //else { alpha = 1.0; }
+
+          Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff;
+          //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
           //if (Id > Imax) { Id = Imax; } // saturation of control signal
 
           U0 = 5000 - (int)(Id); //*(4000/Imax)); // - delO;
@@ -434,13 +440,18 @@ main(void)
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
 
           // calculate motor torques (in mNm) based on currents
-          T0 = kt*((((float)I0_raw)-1000.0)/1000.0)*Imax;
-          T1 = kt*((((float)I1_raw)-1000.0)/1000.0)*Imax;
+          Tm0 = kt*((((float)I0_raw)-1250.0)/1100.0)*Imax;
+          Tm1 = kt*((((float)I1_raw)-1250.0)/1100.0)*Imax;
+
+          Tin0 = J*Acc0 - Tm0;
+          Tin1 = J*Acc1 - Tm1;
 
           // transmit data.
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
-          UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff), (int)(ScaledVelDiff)); // only return some data
+          //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
+          //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
+          UARTprintf("%d, %d\n", (int)Kp_alpha, U0-5000);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
