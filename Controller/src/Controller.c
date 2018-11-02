@@ -401,14 +401,14 @@ main(void)
 
           // calculate desired current based on tuning parameter alpha and pos/rate difference
           //sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
-          filt_force = 0.95*filt_force + 0.05*(float)I1_raw;
+          filt_force = 0.9*filt_force + 0.1*(float)I1_raw;
 
-          if (filt_force<425) {
+          if (filt_force>3330) {
             alpha = 1.0;
             Kp_alpha = 100.0; }
           else {
             alpha = 0.0;
-            Kp_alpha = Kp_alpha + 2.0; // integrate Kp during contact to a new max value
+            Kp_alpha = Kp_alpha + 100.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
           }
           //if (ScaledPosDiff>5.0) { alpha = 0.0; }
@@ -454,7 +454,7 @@ main(void)
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
           //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d, %d\n", (int)Kp_alpha, U0-5000, (int)filt_force);
+          UARTprintf("%d, %d, %d\n", (int)Kp_alpha, U0-5000, I1_raw);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
