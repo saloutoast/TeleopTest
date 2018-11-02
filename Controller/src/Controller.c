@@ -292,6 +292,7 @@ main(void)
     float Id = 0.0;
     float alpha = 0.0;
     int sw_val = 0;
+    float filt_force = 0.0;
     GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     float kt = 19.4; // torque constant in mNm/A
@@ -399,8 +400,10 @@ main(void)
 
 
           // calculate desired current based on tuning parameter alpha and pos/rate difference
-          sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
-          if (sw_val==0) {
+          //sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
+          filt_force = 0.95*filt_force + 0.05*(float)I1_raw;
+
+          if (filt_force<425) {
             alpha = 1.0;
             Kp_alpha = 100.0; }
           else {
@@ -451,7 +454,7 @@ main(void)
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
           //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d\n", (int)Kp_alpha, U0-5000);
+          UARTprintf("%d, %d, %d\n", (int)Kp_alpha, U0-5000, (int)filt_force);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
