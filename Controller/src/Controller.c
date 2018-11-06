@@ -287,11 +287,12 @@ main(void)
     //float Kp_free = 10.0;
     //float Kp_contact = 100.0;
     float Kp_alpha = 0.0;
-    float Kd = 35.0;
+    float Kd = 45.0;
+    float Kd_B = 0.0;
     float Imax = 1.5;
     float Id = 0.0;
     float alpha = 0.0;
-    int sw_val = 0;
+    int contact_flag = 0;
     float filt_force = 0.0;
     GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
@@ -351,7 +352,7 @@ main(void)
           PosDiffTemp = PosDiff; // no deadzone for position
 
           VelDiff = Vel1-Vel0;
-          VelDiffFilt = ((9.0*VelDiffFilt) + VelDiff) / 10.0;
+          VelDiffFilt = (0.9*VelDiffFilt) + (0.1*VelDiff);
 
           //if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
           //else { VelDiffTemp = VelDiffFilt; }
@@ -403,12 +404,26 @@ main(void)
           //sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
           filt_force = 0.9*filt_force + 0.1*(float)I1_raw;
 
-          if (filt_force>3330) {
+          if (filt_force>3000) { // && (contact_flag==0)) { // not in contact
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED if not in contact
             alpha = 1.0;
-            Kp_alpha = 100.0; }
-          else {
-            alpha = 0.0;
+            Kp_alpha = Kp_alpha - 20.0; // integrate Kp to the free motion value
+            if (Kp_alpha < 100.0) { Kp_alpha = 100.0; }
+          }
+          /*else if ((filt_force>3000) && (contact_flag==1)) { // recently left contact
+            contact_flag = 0;
+            Kp_alpha = Kp_alpha - 20.0; // integrate Kp to the free motion value
+            if (Kp_alpha < 100.0) { Kp_alpha = 100.0; }
+          }
+          else if ((filt_force<3000) && (contact_flag==0)) { // recently entered contact
+            contact_flag = 1;
             Kp_alpha = Kp_alpha + 100.0; // integrate Kp during contact to a new max value
+            if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
+          } */
+          else { // filt_force < 3000 and contact_flag==1 //  in contact
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of contact
+            alpha = 0.0;
+            Kp_alpha = Kp_alpha + 50.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
           }
           //if (ScaledPosDiff>5.0) { alpha = 0.0; }
@@ -419,7 +434,7 @@ main(void)
           //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
           //if (Id > Imax) { Id = Imax; } // saturation of control signal
 
-          U0 = 5000 - (int)(Id); //*(4000/Imax)); // - delO;
+          U0 = 5000 - (int)(Id) - (int)(Kd_B*ScaledVelDiff); //*(4000/Imax)); // - delO;
           U1 = 5000 + (int)(Id); //*(4000/Imax)); // + delO;
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
@@ -433,14 +448,12 @@ main(void)
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
           // sample motor current from analog inputs
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of sampling
           ADCIntClear(ADC0_BASE, 1);
           ADCProcessorTrigger(ADC0_BASE, 1);
           while(!ADCIntStatus(ADC0_BASE, 1, false)) {} // wait for sampling to finish
           ADCSequenceDataGet(ADC0_BASE, 1, ADCvals); // retrieve data from ADC FIFO buffer
           I0_raw = ADCvals[1]; // raw current value for motor 0
           I1_raw = ADCvals[0]; // raw current value for motor 1
-          GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED after sampling process is complete
 
           // calculate motor torques (in mNm) based on currents
           Tm0 = kt*((((float)I0_raw)-1250.0)/1100.0)*Imax;
