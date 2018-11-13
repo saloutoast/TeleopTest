@@ -430,7 +430,7 @@ main(void)
           //else if (ScaledPosDiff<-5.0) { alpha = 0.0; }
           //else { alpha = 1.0; }
 
-          //Kp_alpha = 100.0;
+          Kp_alpha = 100.0;
           Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff;
           //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
           //if (Id > Imax) { Id = Imax; } // saturation of control signal
