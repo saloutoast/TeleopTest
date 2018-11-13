@@ -430,6 +430,7 @@ main(void)
           //else if (ScaledPosDiff<-5.0) { alpha = 0.0; }
           //else { alpha = 1.0; }
 
+          //Kp_alpha = 100.0;
           Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff;
           //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
           //if (Id > Imax) { Id = Imax; } // saturation of control signal
@@ -467,7 +468,7 @@ main(void)
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
           //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d\n", (int)Kp_alpha, U0-5000);
+          UARTprintf("%d, %d, %d, %d, %d\n", (int)Kp_alpha, U0-5000, (int)PosDiffFilt, (int)VelDiffFilt, (int)filt_force);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
