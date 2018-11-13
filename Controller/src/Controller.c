@@ -278,10 +278,10 @@ main(void)
     //int clock_time = 0;
 
     // SSI values
-    //long Eout = 0;
-    //long Fslave = 0;
-    //long delO = 0;
-    //int SSI_flag = 0; // flag for whether SSI is activated
+    float Eout = 0.0;
+    float Fslave = 0.0;
+    float delO = 0.0;
+    int SSI_flag = 1; // flag for whether SSI is activated
 
     // controller values
     //float Kp_free = 10.0;
@@ -361,44 +361,18 @@ main(void)
           ScaledPosDiff = (float)PosDiffTemp*(360.0/8192.0); // in deg
           ScaledVelDiff = (float)VelDiffTemp*(2*M_PI/8.192); // approximately in rad/sec
 
-          // SSI from matlab code:
-
-          //% calculate control currents, saturated at idmax
-          //id_temp = (-Kp*((theta(1,tt-1)-theta(3,tt-1))*(180/pi))-(Kd*(theta(2,tt-1)-theta(4,tt-1))))*(imax/4000);
-          //
-          //% SSI code (1 is master, 0 is slave)
-          //xmax = (theta(3,tt-1)-theta(1,tt-1))*(180/pi);
-          //fmax = controls(2,tt-1)*kt;
-          //
-          //Eout = step*((Kp*xmax)+SSI_vals(tt-1))*(theta(4,tt-1)-theta(2,tt-1));
-          //if ( xmax > 0) % master ahead of slave
-          //  delO = -(2/xmax)*(Eout - (xmax*fmax*0.5)); % positive
-          //else % slave ahead of master
-          //  delO = (2/xmax)*(Eout - (xmax*fmax*0.5)); % negative
-          //end
-          //
-          //SSI_vals(tt) = delO;
-          //id = max(min( (id_temp+(SSI*delO)) ,imax),-imax);
-          //controls(:,tt) = [id_temp; id; id_temp+(SSI*delO)];
-
-          /*
-
           // TODO: implement SSI on TIVA here
           if (SSI_flag==1) {
-            Eout = ((4000*k*ScaledPosDiff) + (delO*ScaledVelDiff)) / 1000;
-            Fslave = (U0-5000)/5; // last current * kt
-            if (ScaledPosDiff>0) {
-              delO = (-2 * (Eout - (ScaledPosDiff*Fslave/2)))/ScaledPosDiff;
+            if (VelDiffFilt>0) {
+              delO = (2*Eout)/ScaledPosDiff - Fslave;
             } else {
-              delO = (2 * (Eout - (ScaledPosDiff*Fslave/2)))/ScaledPosDiff;
+              delO = Fslave - (2*Eout)/ScaledPosDiff;
             }
+            Fslave = kt*(10.0*ScaledPosDiff)*(Imax/4000.0); // + delO; // assume last force command was achieved
+            Eout = Eout + (0.001*(Fslave)*VelDiffFilt);
           } else {
             delO = 0;
           }
-
-          */
-
-
 
           // calculate desired current based on tuning parameter alpha and pos/rate difference
           //sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
@@ -431,7 +405,7 @@ main(void)
           //else { alpha = 1.0; }
 
           Kp_alpha = 100.0;
-          Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff;
+          Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff; // + delO;
           //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
           //if (Id > Imax) { Id = Imax; } // saturation of control signal
 
@@ -463,12 +437,12 @@ main(void)
           Tin0 = J*Acc0 - Tm0;
           Tin1 = J*Acc1 - Tm1;
 
-          // transmit data.
+          // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
           //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d, %d, %d, %d\n", (int)Kp_alpha, U0-5000, (int)PosDiffFilt, (int)VelDiffFilt, (int)filt_force);
+          UARTprintf("%d, %d, %d, %d, %d, %d\n", U0-5000, (int)ScaledPosDiff, (int)VelDiffFilt, (int)(Fslave*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
