@@ -251,7 +251,7 @@ main(void)
     int DelPos1 = 0;
     int PosDiff = 0;
     int PosDiffTemp = 0;
-    //int PosDiffFilt = 0;
+    float PosDiffFilt = 0;
 
     float Vel0 = 0;
     float Vel1 = 0;
@@ -335,7 +335,7 @@ main(void)
           if (DelPos1<-6144) { DelPos1 = DelPos1 + 8192; }
           if (DelPos1>6144)  { DelPos1 = DelPos1 - 8192; }
           PosDiff = PosDiff + DelPos1 - DelPos0; // calculate difference with 0 wrapping
-          //PosDiffFilt = ((3*PosDiffFilt) + PosDiff) / 4; // filter the positions
+          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiff); // filter the positions
           LastPos0 = Pos0;
           LastPos1 = Pos1;
 
@@ -349,7 +349,7 @@ main(void)
 
           //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
           //else { PosDiffTemp = PosDiff; }
-          PosDiffTemp = PosDiff; // no deadzone for position
+          PosDiffTemp = PosDiffFilt; // no deadzone for position
 
           VelDiff = Vel1-Vel0;
           VelDiffFilt = (0.9*VelDiffFilt) + (0.1*VelDiff);
@@ -407,7 +407,7 @@ main(void)
           if (filt_force>3000) { // && (contact_flag==0)) { // not in contact
             GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED if not in contact
             alpha = 1.0;
-            Kp_alpha = Kp_alpha - 20.0; // integrate Kp to the free motion value
+            Kp_alpha = Kp_alpha - 5.0; // integrate Kp to the free motion value
             if (Kp_alpha < 100.0) { Kp_alpha = 100.0; }
           }
           /*else if ((filt_force>3000) && (contact_flag==1)) { // recently left contact
@@ -423,7 +423,7 @@ main(void)
           else { // filt_force < 3000 and contact_flag==1 //  in contact
             GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of contact
             alpha = 0.0;
-            Kp_alpha = Kp_alpha + 50.0; // integrate Kp during contact to a new max value
+            Kp_alpha = Kp_alpha + 10.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
           }
           //if (ScaledPosDiff>5.0) { alpha = 0.0; }
@@ -467,7 +467,7 @@ main(void)
           //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
           //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
           //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d, %d\n", (int)Kp_alpha, U0-5000, I1_raw);
+          UARTprintf("%d, %d\n", (int)Kp_alpha, U0-5000);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
