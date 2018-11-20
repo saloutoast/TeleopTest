@@ -252,9 +252,10 @@ main(void)
     unsigned int LastPos1raw = 0;
     int DelPos1raw = 0;
 
-    float Pos1 = 0;
-    float Vel1 = 0;
-    float VelOld1 = 0;
+    float Pos1 = 0.0;
+    float PosOld1 = 0.0;
+    float Vel1 = 0.0;
+    float VelOld1 = 0.0;
 
     int U1 = 5000;
 
@@ -262,20 +263,33 @@ main(void)
     unsigned long ADCvals[4];
     unsigned long I0_raw = 0; // unconverted current values (still digital)
     unsigned long I1_raw = 0;
+    float I0_real = 0.0;
+    float I1_real = 0.0;
 
-    // SSI values
-    float Eout = 0.0;
-    float Fslave = 0.0;
-    float delO = 0.0;
-    int SSI_flag = 0; // flag for whether SSI is activated
-
-    // controller values
-    float Kp_alpha = 0.0;
-    float Kd = 45.0;
-    float Kd_B = 0.0;
+    // vanilla controller values
+    float VEPos = 4.5;
+    float Kp = 0.3; // Amps/rad
     float Imax = 1.5;
     float Id = 0.0;
+    float IdOld = 0.0;
+    int contact = 0;
 
+    // SSI controller values
+    float f = 0.0;
+    float fe = 0.0;
+    float fp = 0.0;
+    float fr = 0.0;
+    float x = 0.0;
+    float xp = 0.0;
+    float alpha = 0.0;
+    float beta = 0.0;
+    float mu = 0.0;
+    float Kv = 0.001; // initial guess, Kv = 2*bm/T
+    float Ke = 0.3; // desired stiffness
+    int SSI_flag = 1; // flag for whether SSI is activated
+    int pressing = 0; // flag for pressing or releasing cycles
+
+    // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
     float J = 1.0; // motor and arm inertia
     float Acc0 = 0.0;
@@ -307,14 +321,73 @@ main(void)
           if (DelPos1raw>6144)  { DelPos1raw = DelPos1raw - 8192; }
           LastPos1raw = Pos1raw;
 
-          Pos1 = (float)Pos1raw*(360.0/8192.0); // in deg
-          VelOld1 = Vel1
-          Vel1 = (float)DelPos1*(2*M_PI/8.192); // approximately in rad/sec
+          Pos1 = Pos1 + (float)DelPos1raw*(2*M_PI/8192.0); // in rad
+          Vel1 = (float)DelPos1raw*(2*M_PI/8.192); // approximately in rad/sec
           Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0; // rad/s/s
 
-          Kp_alpha = 100.0;
-          Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff; // + delO;
-          U1 = 5000 + (int)(Id); //*(4000/Imax)); // + delO;
+          // filter velocity?
+
+          // calculate control effort
+          if (SSI_flag==1) { // SSI for VE
+
+            x = Pos1-VEPos;
+
+            if(x>0.0) { // if in contact with virtual wall
+
+              if(Vel1>0.0) { // in a pressing cycle
+                fe = Ke*x;
+                if(pressing==0) { // newly started pressing cycle
+                  pressing = 1;
+                  alpha = ((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
+                }
+                f = fe - ((fe-fp)/alpha);
+              } else {
+                if(Vel1<0.0) { // in a releasing cycle
+                  if(pressing==1) { // newly started releasing cycles
+                    pressing = 0;
+                    mu = fp/xp; // use last f,x values from pressing cycle
+                    beta = (((mu*x)-fp)/((Kv*x)-(Kv*xp)));
+                  }
+                  f = fp + (((mu*x)-fp)/beta);
+                } else { // velocity is 0, check pressing flag
+                  /*if(pressing==1) { // last in a pressing cycle
+                    fe = Ke*x;
+                    f = fe - ((fe-fp)/alpha);
+                  } else { // last in a releasing cycle
+                    f = fp + (((mu*x)-fp)/beta);
+                  } */
+                  f = fp; // maintain force
+                }
+              }
+
+              Id = f; // map force to desired current
+              contact = 1;
+
+              // store previous values
+              xp = x;
+              fp = f;
+
+            } else {
+              Id = 0.0;
+              contact = 0;
+              xp = 0.0;
+              fp = 0.0;
+              f = 0.0;
+              fe = 0.0;
+              pressing = 0;
+            }
+
+          } else { // normal virtual environment (simple spring)
+            if(Pos1>VEPos) { // if in contact with virtual wall
+              Id = Kp*(VEPos-Pos1);
+              contact = 1;
+            } else { // not in contact with virtual wall
+              Id = 0.0;
+              contact = 0;
+            }
+          }
+
+          U1 = 5000 - (int)(Id*4000/Imax); // + delO;
 
           if (U1 < 1010) { U1 = 1010; }
           if (U1 > 8990) { U1 = 8990; }
@@ -322,6 +395,11 @@ main(void)
           // set new PWM values
           //PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
+
+          // record values
+          PosOld1 = Pos1;
+          VelOld1 = Vel1;
+          IdOld = Id;
 
           // sample motor current from analog inputs
           ADCIntClear(ADC0_BASE, 1);
@@ -332,15 +410,17 @@ main(void)
           I1_raw = ADCvals[0]; // raw current value for motor 1
 
           // calculate motor torques (in mNm) based on currents
-          Tm0 = kt*((((float)I0_raw)-1250.0)/1100.0)*Imax;
-          Tm1 = kt*((((float)I1_raw)-1250.0)/1100.0)*Imax;
+          I0_real = ((((float)I0_raw)-1250.0)/1150.0)*Imax;
+          I1_real = ((((float)I1_raw)-1250.0)/1150.0)*Imax;
+          Tm0 = kt*I0_real;
+          Tm1 = kt*I1_real;
 
           Tin0 = J*Acc0 - Tm0;
           Tin1 = J*Acc1 - Tm1;
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d, %d\n", U0-5000, (int)ScaledPosDiff, (int)VelDiffFilt, (int)(Fslave*1000), (int)(delO*1000), (int)(Eout*1000));
+          UARTprintf("%d, %d, %d, %d, %d, %d\n", (int)(Pos1*1000), pressing, (int)(fe*1000), (int)(f*1000), (int)(alpha*1000), (int)beta);
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 

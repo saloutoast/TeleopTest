@@ -1,4 +1,4 @@
-build/Controller.o: src/Controller.c \
+build/SSI.o: src/SSI.c \
  /home/andrew/Embedded/gcc-arm-none-eabi-5_4-2016q3/lib/gcc/arm-none-eabi/5.4.1/include/stdint.h \
  /home/andrew/Embedded/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/stdint.h \
  /home/andrew/Embedded/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_types.h \
