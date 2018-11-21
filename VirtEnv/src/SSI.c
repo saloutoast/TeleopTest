@@ -281,11 +281,13 @@ main(void)
     float fr = 0.0;
     float x = 0.0;
     float xp = 0.0;
+    float xtop = 0.0;
+    float ftop = 0.0;
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.001; // initial guess, Kv = 2*bm/T
-    float Ke = 0.3; // desired stiffness
+    float Kv = 1; // initial guess, Kv = 2*bm/T
+    float Ke = 5; // desired stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
 
@@ -335,17 +337,27 @@ main(void)
             if(x>0.0) { // if in contact with virtual wall
 
               if(Vel1>0.0) { // in a pressing cycle
+              //if(DelPos1raw>3) {
                 fe = Ke*x;
                 if(pressing==0) { // newly started pressing cycle
                   pressing = 1;
                   alpha = ((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
+                  UARTprintf("%d, %d, %d, %d, %d\n", (int)(fe), (int)(fp), (int)(x*1000), (int)(xp*1000), (int)(alpha*1000));
+
                 }
                 f = fe - ((fe-fp)/alpha);
+
+                if(x>xtop) {xtop=x;}
+                if(f>ftop) {ftop=f;}
+
               } else {
                 if(Vel1<0.0) { // in a releasing cycle
+                //if(DelPos1raw<-3) {
                   if(pressing==1) { // newly started releasing cycles
                     pressing = 0;
-                    mu = fp/xp; // use last f,x values from pressing cycle
+                    mu = ftop/xtop; // use last f,x values from pressing cycle
+                    ftop = 0.0;
+                    xtop = 0.0;
                     beta = (((mu*x)-fp)/((Kv*x)-(Kv*xp)));
                   }
                   f = fp + (((mu*x)-fp)/beta);
@@ -360,7 +372,7 @@ main(void)
                 }
               }
 
-              Id = f; // map force to desired current
+              Id = Ke*x;//f; // map force to desired current
               contact = 1;
 
               // store previous values
@@ -420,9 +432,10 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d, %d\n", (int)(Pos1*1000), pressing, (int)(fe*1000), (int)(f*1000), (int)(alpha*1000), (int)beta);
+          //UARTprintf("%d, %d, %d, %d, %d, %d\n", (int)(Pos1*1000), pressing, (int)(Id*1000), (int)(f*1000), (int)(alpha), (int)beta);
+          //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //transmit_time = before - after;
+          //transmit_time = before - after;)
 
           // Turn off the LED.
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
