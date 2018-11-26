@@ -286,14 +286,14 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.1; // initial guess, Kv = 2*bm/T
-    float Ke = 10; // desired stiffness
-    int SSI_flag = 0; // flag for whether SSI is activated
+    float Kv = 1; // initial guess, Kv = 2*bm/T
+    float Ke = 1000; // desired stiffness
+    int SSI_flag = 1; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
 
     // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
-    float J = 1.0; // motor and arm inertia
+    float J = 0.01454*0.075*0.075; // bolt "handle" inertia
     float Acc0 = 0.0;
     float Acc1 = 0.0;
     float Tm0 = 0.0;
@@ -432,7 +432,7 @@ main(void)
           UARTprintf("%d, %d, %d, %d, %d\n", (int)(x*1000), U1, pressing, (int)(f*1000), (int)(fe*1000));
           //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //transmit_time = before - after;)
+          //transmit_time = before - after;
 
           // Turn off the LED.
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
