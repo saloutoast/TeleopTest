@@ -286,7 +286,7 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 1; // initial guess, Kv = 2*bm/T
+    float Kv = 0.1; // initial guess, Kv = 2*bm/T
     float Ke = 5; // desired stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
@@ -341,11 +341,11 @@ main(void)
                 fe = Ke*x;
                 if(pressing==0) { // newly started pressing cycle
                   pressing = 1;
-                  alpha = ((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
-                  UARTprintf("%d, %d, %d, %d, %d\n", (int)(fe), (int)(fp), (int)(x*1000), (int)(xp*1000), (int)(alpha*1000));
+                  alpha = Kv; //((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
+                  //UARTprintf("%d, %d, %d, %d, %d\n", (int)(fe), (int)(fp), (int)(x*1000), (int)(xp*1000), (int)(alpha*1000));
 
                 }
-                f = fe - ((fe-fp)/alpha);
+                f = fp + Kv*(x-xp); //fe - ((fe-fp)/alpha);
 
                 if(x>xtop) {xtop=x;}
                 if(f>ftop) {ftop=f;}
@@ -358,9 +358,9 @@ main(void)
                     mu = ftop/xtop; // use last f,x values from pressing cycle
                     ftop = 0.0;
                     xtop = 0.0;
-                    beta = (((mu*x)-fp)/((Kv*x)-(Kv*xp)));
+                    beta = 0.5*Kv; //(((mu*x)-fp)/((Kv*x)-(Kv*xp)));
                   }
-                  f = fp + (((mu*x)-fp)/beta);
+                  f = fp + beta*(x-xp); //fp + (((mu*x)-fp)/beta);
                 } else { // velocity is 0, check pressing flag
                   /*if(pressing==1) { // last in a pressing cycle
                     fe = Ke*x;
@@ -372,7 +372,7 @@ main(void)
                 }
               }
 
-              Id = Ke*x;//f; // map force to desired current
+              Id = f; // map force to desired current
               contact = 1;
 
               // store previous values
@@ -391,7 +391,7 @@ main(void)
 
           } else { // normal virtual environment (simple spring)
             if(Pos1>VEPos) { // if in contact with virtual wall
-              Id = Kp*(VEPos-Pos1);
+              Id = Ke*(Pos1-VEPos);
               contact = 1;
             } else { // not in contact with virtual wall
               Id = 0.0;
@@ -399,7 +399,7 @@ main(void)
             }
           }
 
-          U1 = 5000 - (int)(Id*4000/Imax); // + delO;
+          U1 = 5000 + (int)(Id*4000/Imax); // + delO;
 
           if (U1 < 1010) { U1 = 1010; }
           if (U1 > 8990) { U1 = 8990; }
@@ -432,7 +432,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //UARTprintf("%d, %d, %d, %d, %d, %d\n", (int)(Pos1*1000), pressing, (int)(Id*1000), (int)(f*1000), (int)(alpha), (int)beta);
+          UARTprintf("%d, %d, %d, %d\n", (int)(Pos1*1000), U1, pressing, (int)(f*1000));
           //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;)
