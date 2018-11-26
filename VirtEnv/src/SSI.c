@@ -267,7 +267,7 @@ main(void)
     float I1_real = 0.0;
 
     // vanilla controller values
-    float VEPos = 4.5;
+    float VEPos = 4.0;
     float Kp = 0.3; // Amps/rad
     float Imax = 1.5;
     float Id = 0.0;
@@ -287,8 +287,8 @@ main(void)
     float beta = 0.0;
     float mu = 0.0;
     float Kv = 0.1; // initial guess, Kv = 2*bm/T
-    float Ke = 5; // desired stiffness
-    int SSI_flag = 1; // flag for whether SSI is activated
+    float Ke = 10; // desired stiffness
+    int SSI_flag = 0; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
 
     // for dynamics calculations
@@ -330,73 +330,70 @@ main(void)
           // filter velocity?
 
           // calculate control effort
-          if (SSI_flag==1) { // SSI for VE
+          // SSI for VE
+          x = Pos1-VEPos;
 
-            x = Pos1-VEPos;
+          if(x>0.0) { // if in contact with virtual wall
 
-            if(x>0.0) { // if in contact with virtual wall
+            fe = Ke*x;
 
-              if(Vel1>0.0) { // in a pressing cycle
-              //if(DelPos1raw>3) {
-                fe = Ke*x;
-                if(pressing==0) { // newly started pressing cycle
-                  pressing = 1;
-                  alpha = Kv; //((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
-                  //UARTprintf("%d, %d, %d, %d, %d\n", (int)(fe), (int)(fp), (int)(x*1000), (int)(xp*1000), (int)(alpha*1000));
+            if(Vel1>0.0) { // in a pressing cycle
+            //if(DelPos1raw>3) {
 
-                }
-                f = fp + Kv*(x-xp); //fe - ((fe-fp)/alpha);
+              if(pressing==0) { // newly started pressing cycle
+                pressing = 1;
+                alpha = Kv; //((fe-fp) / (fe - ((Kv*x)+fp-(Kv*xp)))); // calculate alpha for this cycle
+                //UARTprintf("%d, %d, %d, %d, %d\n", (int)(fe), (int)(fp), (int)(x*1000), (int)(xp*1000), (int)(alpha*1000));
 
-                if(x>xtop) {xtop=x;}
-                if(f>ftop) {ftop=f;}
-
-              } else {
-                if(Vel1<0.0) { // in a releasing cycle
-                //if(DelPos1raw<-3) {
-                  if(pressing==1) { // newly started releasing cycles
-                    pressing = 0;
-                    mu = ftop/xtop; // use last f,x values from pressing cycle
-                    ftop = 0.0;
-                    xtop = 0.0;
-                    beta = 0.5*Kv; //(((mu*x)-fp)/((Kv*x)-(Kv*xp)));
-                  }
-                  f = fp + beta*(x-xp); //fp + (((mu*x)-fp)/beta);
-                } else { // velocity is 0, check pressing flag
-                  /*if(pressing==1) { // last in a pressing cycle
-                    fe = Ke*x;
-                    f = fe - ((fe-fp)/alpha);
-                  } else { // last in a releasing cycle
-                    f = fp + (((mu*x)-fp)/beta);
-                  } */
-                  f = fp; // maintain force
-                }
               }
+              f = fp + Kv*(x-xp); //fe - ((fe-fp)/alpha);
 
-              Id = f; // map force to desired current
-              contact = 1;
-
-              // store previous values
-              xp = x;
-              fp = f;
+              if(x>xtop) {xtop=x;}
+              if(f>ftop) {ftop=f;}
 
             } else {
-              Id = 0.0;
-              contact = 0;
-              xp = 0.0;
-              fp = 0.0;
-              f = 0.0;
-              fe = 0.0;
-              pressing = 0;
+              if(Vel1<0.0) { // in a releasing cycle
+              //if(DelPos1raw<-3) {
+                if(pressing==1) { // newly started releasing cycles
+                  pressing = 0;
+                  mu = ftop/xtop; // use last f,x values from pressing cycle
+                  ftop = 0.0;
+                  xtop = 0.0;
+                  beta = 0.5*Kv; //(((mu*x)-fp)/((Kv*x)-(Kv*xp)));
+                }
+                f = fp + beta*(x-xp); //fp + (((mu*x)-fp)/beta);
+              } else { // velocity is 0, check pressing flag
+                /*if(pressing==1) { // last in a pressing cycle
+                  fe = Ke*x;
+                  f = fe - ((fe-fp)/alpha);
+                } else { // last in a releasing cycle
+                  f = fp + (((mu*x)-fp)/beta);
+                } */
+                f = fp; // maintain force
+              }
             }
 
-          } else { // normal virtual environment (simple spring)
-            if(Pos1>VEPos) { // if in contact with virtual wall
-              Id = Ke*(Pos1-VEPos);
-              contact = 1;
-            } else { // not in contact with virtual wall
-              Id = 0.0;
-              contact = 0;
-            }
+            Id = f; // map force to desired current
+            contact = 1;
+
+            // store previous values
+            xp = x;
+            fp = f;
+
+          } else {
+            Id = 0.0;
+            contact = 0;
+            xp = 0.0;
+            fp = 0.0;
+            f = 0.0;
+            fe = 0.0;
+            pressing = 0;
+          }
+
+          if(SSI_flag==1) {
+            Id = f;
+          } else {
+            Id = fe;
           }
 
           U1 = 5000 + (int)(Id*4000/Imax); // + delO;
@@ -432,7 +429,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d\n", (int)(Pos1*1000), U1, pressing, (int)(f*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", (int)(x*1000), U1, pressing, (int)(f*1000), (int)(fe*1000));
           //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;)
