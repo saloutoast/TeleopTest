@@ -398,9 +398,7 @@ main(void)
             Kdisp = 0.0;
           }
 
-          if(SSI_flag==1) {
-            Id = f;
-          } else {
+          if(SSI_flag==0) {
             Id = fe;
           }
 
