@@ -286,10 +286,11 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 1; // initial guess, Kv = 2*bm/T
-    float Ke = 1000; // desired stiffness
+    float Kv = 0.15; // initial guess, Kv = 2*bm/T
+    float Ke = 3; // desired stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
+    float Kdisp = 0.0; // calculate displayed stiffness
 
     // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
@@ -359,7 +360,7 @@ main(void)
                   mu = ftop/xtop; // use last f,x values from pressing cycle
                   ftop = 0.0;
                   xtop = 0.0;
-                  beta = 0.5*Kv; //(((mu*x)-fp)/((Kv*x)-(Kv*xp)));
+                  beta = 0.1*Kv; //(((mu*x)-fp)/((Kv*x)-(Kv*xp)));
                 }
                 f = fp + beta*(x-xp); //fp + (((mu*x)-fp)/beta);
               } else { // velocity is 0, check pressing flag
@@ -373,7 +374,13 @@ main(void)
               }
             }
 
-            Id = f; // map force to desired current
+            if (f>fe) {
+              Id = fe; // set to desired stiffness
+              Kdisp = Ke;
+            } else {
+              Id = f; // map force to desired current
+              Kdisp = f/x;
+            }
             contact = 1;
 
             // store previous values
@@ -388,6 +395,7 @@ main(void)
             f = 0.0;
             fe = 0.0;
             pressing = 0;
+            Kdisp = 0.0;
           }
 
           if(SSI_flag==1) {
@@ -429,7 +437,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d\n", (int)(x*1000), U1, pressing, (int)(f*1000), (int)(fe*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", (int)(x*1000), (int)(f*1000), (int)(Id*1000), U1, (int)(Kdisp*1000));
           //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
