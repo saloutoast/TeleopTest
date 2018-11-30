@@ -400,6 +400,7 @@ main(void)
 
           if(SSI_flag==0) {
             Id = fe;
+            Kdisp = Ke;
           }
 
           U1 = 5000 + (int)(Id*4000/Imax); // + delO;
@@ -435,7 +436,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d\n", (int)(x*1000), (int)(f*1000), (int)(Id*1000), U1, (int)(Kdisp*1000));
+          UARTprintf("%d, %d, %d, %d, %d, %d\n", (int)(x*1000), (int)(f*1000), (int)(fe*1000), (int)(Id*1000), U1, (int)(Kdisp*1000));
           //UARTprintf("%d, %d, %d, %d\n", pressing, (int)(xtop*1000), (int)(ftop*1000), (int)(mu*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
