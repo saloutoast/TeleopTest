@@ -286,8 +286,8 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.15; // initial guess, Kv = 2*bm/T
-    float Ke = 3; // desired stiffness
+    float Kv = 1; // initial guess, Kv = 2*bm/T
+    float Ke = 1000; // desired stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int pressing = 0; // flag for pressing or releasing cycles
     float Kdisp = 0.0; // calculate displayed stiffness
@@ -364,23 +364,23 @@ main(void)
                 }
                 f = fp + beta*(x-xp); //fp + (((mu*x)-fp)/beta);
               } else { // velocity is 0, check pressing flag
-                /*if(pressing==1) { // last in a pressing cycle
-                  fe = Ke*x;
-                  f = fe - ((fe-fp)/alpha);
+                if(pressing==1) { // last in a pressing cycle
+                  f = fp; // + Kv(x-xp);
                 } else { // last in a releasing cycle
-                  f = fp + (((mu*x)-fp)/beta);
-                } */
-                f = fp; // maintain force
+                  f = fp; // + beta*(x-xp);
+                }
               }
             }
 
-            if (f>fe) {
+            /* if (f>fe) {
               Id = fe; // set to desired stiffness
               Kdisp = Ke;
             } else {
               Id = f; // map force to desired current
               Kdisp = f/x;
-            }
+            } */
+            Id = f;
+            Kdisp = f/x;
             contact = 1;
 
             // store previous values
