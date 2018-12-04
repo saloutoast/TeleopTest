@@ -294,8 +294,8 @@ main(void)
 
     // vanilla controller values
     float Kp = 1.0; // Amps/rad
-    float Kd = 0.1; // Amps/rad/sec
-    float Kd_B = 0.0; // "bonus damping", same units as Kd_B
+    float Kd = 0.0; // Amps/rad/sec
+    float Kd_B = 0.1; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
     float Id_PD = 0.0;
@@ -316,9 +316,9 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.01; // initial guess, Kv = 2*bm/T
+    float Kv = 0.001; // initial guess, Kv = 2*bm/T
     float Ke = 1.0; // desired controller stiffness
-    int SSI_flag = 0; // flag for whether SSI is activated
+    int SSI_flag = 1; // flag for whether SSI is activated
     int SSI_case = 0;
 
     // for dynamics calculations
@@ -370,19 +370,19 @@ main(void)
           //Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0;
 
           // filter position
-          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiffraw);
+          PosDiffFilt = (0.0*PosDiffFilt) + (1.0*(float)PosDiffraw);
           PosDiffTemp = PosDiffFilt; // no deadzone for position
 
           // filter velocity
           VelDiffraw = Vel1raw-Vel0raw;
-          VelDiffFilt = (0.9*VelDiffFilt) + (0.1*(float)VelDiffraw);
+          VelDiffFilt = (0.0*VelDiffFilt) + (1.0*(float)VelDiffraw);
           VelDiffTemp = VelDiffFilt; // no deadzone for velocity
 
           ScaledPosDiff = PosDiffTemp*(2*M_PI/8192.0); // in rad
           ScaledVelDiff = VelDiffTemp*(2*M_PI/8.192); // approximately in rad/sec
 
           // PD calculations
-          Id_PD = Kp*ScaledPosDiff + Kd*VelDiffTemp;
+          Id_PD = Kp*ScaledPosDiff + Kd*ScaledVelDiff;
 
           // SSI calculations (sort out)
 
@@ -428,7 +428,7 @@ main(void)
                 }
 
               } else { // positions are the same
-                delO = delO; // reset
+                delO = 0.0;; // reset
                 SSI_case = 7;
               }
             }
@@ -469,10 +469,10 @@ main(void)
           Kp_alpha = 100.0; */
 
           if (SSI_flag==1) {
-            U0 = 5000 - (int)(Id_SSI*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
+            U0 = 5000 - (int)(Id_SSI*4000/Imax) - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
             U1 = 5000 + (int)(Id_SSI*4000/Imax);
           } else {
-            U0 = 5000 - (int)(Id_PD*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
+            U0 = 5000 - (int)(Id_PD*4000/Imax) - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
             U1 = 5000 + (int)(Id_PD*4000/Imax);
           }
 
