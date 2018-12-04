@@ -318,7 +318,7 @@ main(void)
     float mu = 0.0;
     float Kv = 0.01; // initial guess, Kv = 2*bm/T
     float Ke = 1.0; // desired controller stiffness
-    int SSI_flag = 1; // flag for whether SSI is activated
+    int SSI_flag = 0; // flag for whether SSI is activated
     int SSI_case = 0;
 
     // for dynamics calculations
