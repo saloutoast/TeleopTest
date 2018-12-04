@@ -243,23 +243,23 @@ main(void)
     initMotorControl();
 
     // Initialize the controller variables
-    unsigned int Pos0 = 0;
-    unsigned int LastPos0 = 0;
-    unsigned int Pos1 = 0;
-    unsigned int LastPos1 = 0;
-    int DelPos0 = 0;
-    int DelPos1 = 0;
-    int PosDiff = 0;
-    int PosDiffTemp = 0;
-    float PosDiffFilt = 0;
+    unsigned int Pos0raw = 0;
+    unsigned int LastPosraw0 = 0;
+    unsigned int Pos1raw = 0;
+    unsigned int LastPos1raw = 0;
+    int DelPos0raw = 0;
+    int DelPos1raw = 0;
+    int PosDiffraw = 0;
+    float PosDiffTemp = 0.0;
+    float PosDiffFilt = 0.0;
 
-    float Vel0 = 0;
-    float Vel1 = 0;
-    float VelOld0 = 0;
-    float VelOld1 = 0;
-    float VelDiff = 0;
-    float VelDiffTemp = 0;
-    float VelDiffFilt = 0;
+    int Vel0raw = 0;
+    int Vel1raw = 0;
+    int VelOld0raw = 0;
+    int VelOld1raw = 0;
+    int VelDiffraw = 0;
+    float VelDiffTemp = 0.0;
+    float VelDiffFilt = 0.0;
 
     int U0 = 5000;
     int U1 = 5000;
@@ -268,6 +268,8 @@ main(void)
     unsigned long ADCvals[4];
     unsigned long I0_raw = 0; // unconverted current values (still digital)
     unsigned long I1_raw = 0;
+    float I0_real = 0.0;
+    float I1_real = 0.0;
 
     // scaled values
     float ScaledPosDiff = 0;
@@ -277,27 +279,50 @@ main(void)
     //int after = 0;
     //int clock_time = 0;
 
-    // SSI values
+    // contact controller values
+    //float Kp_free = 10.0;
+    //float Kp_contact = 100.0;
+    //float Kp_alpha = 0.0;
+    //float Kd = 45.0;
+    //float Kd_B = 0.0;
+    //float Imax = 1.5;
+    //float Id = 0.0;
+    //float alpha = 0.0;
+    //int contact_flag = 0;
+    //float filt_force = 0.0;
+    //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
+
+    // vanilla controller values
+    float Kp = 0.3; // Amps/rad
+    float Kd = 0.0; // Amps/rad/sec
+    float Kd_B = 0.0; // "bonus damping", same units as Kd_B
+    float Imax = 1.5;
+    float Id = 0.0;
+    float Id_PD = 0.0;
+    
+    // SSI controller values
+    float ID_SSI = 0.0;
     float Eout = 0.0;
     float Fslave = 0.0;
     float delO = 0.0;
+    float f = 0.0;
+    float fe = 0.0;
+    float fp = 0.0;
+    float fr = 0.0;
+    float x = 0.0;
+    float xp = 0.0;
+    float xtop = 0.0;
+    float ftop = 0.0;
+    float alpha = 0.0;
+    float beta = 0.0;
+    float mu = 0.0;
+    float Kv = 0.5; // initial guess, Kv = 2*bm/T
+    float Ke = 5; // desired controller stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
 
-    // controller values
-    //float Kp_free = 10.0;
-    //float Kp_contact = 100.0;
-    float Kp_alpha = 0.0;
-    float Kd = 45.0;
-    float Kd_B = 0.0;
-    float Imax = 1.5;
-    float Id = 0.0;
-    float alpha = 0.0;
-    int contact_flag = 0;
-    float filt_force = 0.0;
-    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
-
+    // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
-    float J = 1.0; // motor and arm inertia
+    float J = 0.01454*0.075*0.075; // bolt "handle" inertia
     float Acc0 = 0.0;
     float Acc1 = 0.0;
     float Tm0 = 0.0;
@@ -321,70 +346,93 @@ main(void)
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
           // Get position and velocity values
-          Pos0 = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
-          Pos1 = QEIPositionGet(QEI1_BASE);
-
-          //Vel0 = QEIDirectionGet(QEI0_BASE)*QEIVelocityGet(QEI0_BASE);
-          //Vel1 = QEIDirectionGet(QEI1_BASE)*QEIVelocityGet(QEI1_BASE);
+          Pos0raw = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
+          Pos1raw = QEIPositionGet(QEI1_BASE);
 
           // Calculate control efforts, placing limits on values based on PWM period
-          DelPos0 = Pos0 - LastPos0;
-          if (DelPos0<-6144) { DelPos0 = DelPos0 + 8192; }
-          if (DelPos0>6144)  { DelPos0 = DelPos0 - 8192; }
-          DelPos1 = Pos1 - LastPos1;
-          if (DelPos1<-6144) { DelPos1 = DelPos1 + 8192; }
-          if (DelPos1>6144)  { DelPos1 = DelPos1 - 8192; }
-          PosDiff = PosDiff + DelPos1 - DelPos0; // calculate difference with 0 wrapping
-          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiff); // filter the positions
-          LastPos0 = Pos0;
-          LastPos1 = Pos1;
+          DelPos0raw = Pos0raw - LastPos0raw;
+          if (DelPos0raw<-6144) { DelPos0raw = DelPos0raw + 8192; }
+          if (DelPos0raw>6144)  { DelPos0raw = DelPos0raw - 8192; }
+          DelPos1raw = Pos1raw - LastPos1raw;
+          if (DelPos1raw<-6144) { DelPos1raw = DelPos1raw + 8192; }
+          if (DelPos1raw>6144)  { DelPos1raw = DelPos1raw - 8192; }
+          PosDiffraw = PosDiffraw + DelPos1raw - DelPos0raw; // calculate difference with 0 wrapping
+          LastPos0raw = Pos0raw;
+          LastPos1raw = Pos1raw;
 
-          VelOld0 = Vel0;
-          VelOld1 = Vel1;
-          Vel0 = (float)DelPos0; // don't use QEI for velocities, remove scaling by time step
-          Vel1 = (float)DelPos1; // scale by 1000/23 to get degrees per second
+          VelOld0raw = Vel0raw;
+          VelOld1raw = Vel1raw;
+          Vel0raw = DelPos0raw; // don't use QEI for velocities, remove scaling by time step
+          Vel1raw = DelPos1raw; // scale by 1000/23 to get degrees per second
 
-          Acc0 = (Vel0 - VelOld0)*(2*M_PI/8.192)*1000.0; // in rad/sec/sec
-          Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0;
+          //Acc0 = (Vel0 - VelOld0)*(2*M_PI/8.192)*1000.0; // in rad/sec/sec
+          //Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0;
 
-          //if ((PosDiff<25) & (PosDiff>-25)) { PosDiffTemp = 0; }
-          //else { PosDiffTemp = PosDiff; }
+          // filter position
+          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiffraw)
           PosDiffTemp = PosDiffFilt; // no deadzone for position
 
-          VelDiff = Vel1-Vel0;
-          VelDiffFilt = (0.9*VelDiffFilt) + (0.1*VelDiff);
-
-          //if ((VelDiffFilt<10) & (VelDiffFilt>-10)) { VelDiffTemp = 0; }
-          //else { VelDiffTemp = VelDiffFilt; }
+          // filter velocity
+          VelDiffraw = Vel1raw-Vel0raw;
+          VelDiffFilt = (0.9*VelDiffFilt) + (0.1*(float)VelDiffraw);
           VelDiffTemp = VelDiffFilt; // no deadzone for velocity
 
-          ScaledPosDiff = (float)PosDiffTemp*(360.0/8192.0); // in deg
-          ScaledVelDiff = (float)VelDiffTemp*(2*M_PI/8.192); // approximately in rad/sec
+          ScaledPosDiff = PosDiffTemp*(2*M_PI/8192.0); // in rad
+          ScaledVelDiff = VelDiffTemp*(2*M_PI/8.192); // approximately in rad/sec
 
-          // TODO: implement SSI on TIVA here
-          if (SSI_flag==1) {
-            if (VelDiffFilt>0) {
-              delO = (2*Eout)/ScaledPosDiff - Fslave;
-            } else {
-              delO = Fslave - (2*Eout)/ScaledPosDiff;
+          // PD calculations
+          Id_PD = Kp*ScaledPosDiff + Kd*VelDiffTemp;
+
+          // SSI calculations (sort out)
+
+          // maybe have ID calculated in each case, using f=fp+() like with VE
+          // or try delO, calculate change relative to desired force to implement SSI
+          if (SSI_flag==1) { // calculations for master 1, slave 0
+
+            // some energy calculations here?
+            Eout = 0.0;
+            Fslave = 0.0;
+
+
+            if (ScaledPosDiff>0.0) { // master is ahead of slave
+
+              if (ScaledVelDiff<0.0) { // slave is catching up to master (releasing cycle)
+                delO = delO - Kv;
+              } else { // master is getting further ahead (pressing) or velocities are the same
+                delO = delO + Kv; 
+              }
+
+            } else { 
+              if (ScaledPosDiff<0.0) { // slave is ahead of master
+
+                if (ScaledVelDiff>0.0) { // master is catching up to slave ()
+                  delO = delO - Kv;
+                } else {  // slave is getting further ahead or velocities are the same
+                  delO = delO + Kv;
+                }
+
+              } else { // positions are the same
+                delO = delO; // no change
+              }
             }
-            Fslave = kt*(10.0*ScaledPosDiff)*(Imax/4000.0); // + delO; // assume last force command was achieved
-            Eout = Eout + (0.001*(Fslave)*VelDiffFilt);
           } else {
-            delO = 0;
+            delO = 0.0;
           }
 
+          Id_SSI = (Ke+delO)*ScaledPosDiff;
+
+          // contact-based controller calculations
           // calculate desired current based on tuning parameter alpha and pos/rate difference
           //sw_val = GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4);
-          filt_force = 0.9*filt_force + 0.1*(float)I1_raw;
+          //filt_force = 0.9*filt_force + 0.1*(float)I1_raw;
 
-          if (filt_force>3000) { // && (contact_flag==0)) { // not in contact
+          /*if (filt_force>3000) { // && (contact_flag==0)) { // not in contact
             GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); // turn off LED if not in contact
             alpha = 1.0;
             Kp_alpha = Kp_alpha - 5.0; // integrate Kp to the free motion value
             if (Kp_alpha < 100.0) { Kp_alpha = 100.0; }
           }
-          /*else if ((filt_force>3000) && (contact_flag==1)) { // recently left contact
+          else if ((filt_force>3000) && (contact_flag==1)) { // recently left contact
             contact_flag = 0;
             Kp_alpha = Kp_alpha - 20.0; // integrate Kp to the free motion value
             if (Kp_alpha < 100.0) { Kp_alpha = 100.0; }
@@ -393,24 +441,18 @@ main(void)
             contact_flag = 1;
             Kp_alpha = Kp_alpha + 100.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
-          } */
+          } 
           else { // filt_force < 3000 and contact_flag==1 //  in contact
             GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of contact
             alpha = 0.0;
             Kp_alpha = Kp_alpha + 10.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
           }
-          //if (ScaledPosDiff>5.0) { alpha = 0.0; }
-          //else if (ScaledPosDiff<-5.0) { alpha = 0.0; }
-          //else { alpha = 1.0; }
 
-          Kp_alpha = 100.0;
-          Id = Kp_alpha*ScaledPosDiff + Kd*ScaledVelDiff; // + delO;
-          //Id = (alpha)*(Kp_free*(ScaledPosDiff) - (Kd*ScaledVelDiff)) + (1.0-alpha)*(Kp_contact*(ScaledPosDiff));
-          //if (Id > Imax) { Id = Imax; } // saturation of control signal
+          Kp_alpha = 100.0; */
 
-          U0 = 5000 - (int)(Id) - (int)(Kd_B*ScaledVelDiff); //*(4000/Imax)); // - delO;
-          U1 = 5000 + (int)(Id); //*(4000/Imax)); // + delO;
+          U0 = 5000 - (int)(Id*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave 
+          U1 = 5000 + (int)(Id*4000/Imax);
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -431,24 +473,22 @@ main(void)
           I1_raw = ADCvals[0]; // raw current value for motor 1
 
           // calculate motor torques (in mNm) based on currents
-          Tm0 = kt*((((float)I0_raw)-1250.0)/1100.0)*Imax;
-          Tm1 = kt*((((float)I1_raw)-1250.0)/1100.0)*Imax;
+          I0_real = ((((float)I0_raw)-1250.0)/1150.0)*Imax;
+          I1_real = ((((float)I1_raw)-1250.0)/1150.0)*Imax;
+          Tm0 = kt*I0_real;
+          Tm1 = kt*I1_real;
 
           Tin0 = J*Acc0 - Tm0;
           Tin1 = J*Acc1 - Tm1;
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //UARTprintf("%u, %d, %d, %d, %u, %d, %d, %d, %d\n", Pos0, Vel0, U0, I0_raw, Pos1, Vel1, U1, I1_raw, delO);
-          //UARTprintf("%d, %d, %d, %d\n", U0, U1, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000)); // only return some data
-          //UARTprintf("%d, %d, %d, %d, %d\n", I0_raw, I1_raw, U0-5000, (int)Tm0, (int)Tm1); // only return some data
-          UARTprintf("%d, %d, %d, %d, %d, %d\n", U0-5000, (int)ScaledPosDiff, (int)VelDiffFilt, (int)(Fslave*1000), (int)(delO*1000), (int)(Eout*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(Id*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
           // Turn off the LED.
           GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-
 
           // Reset controller flag for next interrupt
           controller_flag = 0;
