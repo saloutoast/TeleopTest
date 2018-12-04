@@ -244,7 +244,7 @@ main(void)
 
     // Initialize the controller variables
     unsigned int Pos0raw = 0;
-    unsigned int LastPosraw0 = 0;
+    unsigned int LastPos0raw = 0;
     unsigned int Pos1raw = 0;
     unsigned int LastPos1raw = 0;
     int DelPos0raw = 0;
@@ -293,15 +293,15 @@ main(void)
     //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // vanilla controller values
-    float Kp = 0.3; // Amps/rad
-    float Kd = 0.0; // Amps/rad/sec
+    float Kp = 1.0; // Amps/rad
+    float Kd = 0.1; // Amps/rad/sec
     float Kd_B = 0.0; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
     float Id_PD = 0.0;
-    
+
     // SSI controller values
-    float ID_SSI = 0.0;
+    float Id_SSI = 0.0;
     float Eout = 0.0;
     float Fslave = 0.0;
     float delO = 0.0;
@@ -316,9 +316,10 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.5; // initial guess, Kv = 2*bm/T
-    float Ke = 5; // desired controller stiffness
+    float Kv = 0.01; // initial guess, Kv = 2*bm/T
+    float Ke = 1.0; // desired controller stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
+    int SSI_case = 0;
 
     // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
@@ -369,7 +370,7 @@ main(void)
           //Acc1 = (Vel1 - VelOld1)*(2*M_PI/8.192)*1000.0;
 
           // filter position
-          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiffraw)
+          PosDiffFilt = (0.9*PosDiffFilt) + (0.1*(float)PosDiffraw);
           PosDiffTemp = PosDiffFilt; // no deadzone for position
 
           // filter velocity
@@ -393,26 +394,42 @@ main(void)
             Eout = 0.0;
             Fslave = 0.0;
 
+            if (ScaledPosDiff>0.01) { // master is ahead of slave
 
-            if (ScaledPosDiff>0.0) { // master is ahead of slave
-
-              if (ScaledVelDiff<0.0) { // slave is catching up to master (releasing cycle)
+              if (ScaledVelDiff<-0.01) { // slave is catching up to master (releasing cycle)
                 delO = delO - Kv;
+                SSI_case = 1;
               } else { // master is getting further ahead (pressing) or velocities are the same
-                delO = delO + Kv; 
+                //delO = delO + Kv;
+                if (ScaledVelDiff>0.01) {
+                  delO = delO + Kv;
+                  SSI_case = 2;
+                } else {
+                  delO = delO;
+                  SSI_case = 3;
+                }
               }
 
-            } else { 
-              if (ScaledPosDiff<0.0) { // slave is ahead of master
+            } else {
+              if (ScaledPosDiff<-0.01) { // slave is ahead of master
 
-                if (ScaledVelDiff>0.0) { // master is catching up to slave ()
+                if (ScaledVelDiff>0.01) { // master is catching up to slave ()
                   delO = delO - Kv;
+                  SSI_case = 4;
                 } else {  // slave is getting further ahead or velocities are the same
-                  delO = delO + Kv;
+                  //delO = delO + Kv;
+                  if (ScaledVelDiff<-0.01) {
+                    delO = delO + Kv;
+                    SSI_case = 5;
+                  } else {
+                    delO = delO;
+                    SSI_case = 6;
+                  }
                 }
 
               } else { // positions are the same
-                delO = delO; // no change
+                delO = delO; // reset
+                SSI_case = 7;
               }
             }
           } else {
@@ -441,7 +458,7 @@ main(void)
             contact_flag = 1;
             Kp_alpha = Kp_alpha + 100.0; // integrate Kp during contact to a new max value
             if (Kp_alpha > 1000.0) { Kp_alpha = 1000.0; }
-          } 
+          }
           else { // filt_force < 3000 and contact_flag==1 //  in contact
             GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // see timing of contact
             alpha = 0.0;
@@ -451,8 +468,13 @@ main(void)
 
           Kp_alpha = 100.0; */
 
-          U0 = 5000 - (int)(Id*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave 
-          U1 = 5000 + (int)(Id*4000/Imax);
+          if (SSI_flag==1) {
+            U0 = 5000 - (int)(Id_SSI*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
+            U1 = 5000 + (int)(Id_SSI*4000/Imax);
+          } else {
+            U0 = 5000 - (int)(Id_PD*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
+            U1 = 5000 + (int)(Id_PD*4000/Imax);
+          }
 
           if (U0 < 1010) { U0 = 1010; } // limit to 15% and 85% for driver modules
           if (U0 > 8990) { U0 = 8990; }
@@ -483,7 +505,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d\n", U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(Id*1000));
+          UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)((Ke+delO)*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
