@@ -431,22 +431,26 @@ main(void)
           }
 
           // energy calculations based on SSI case
-            if ((SSI_case==1)|(SSI_case==2)) {
-              Eout = Eout + (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
+          if ((SSI_case==1)|(SSI_case==2)) {
+            if (SSI_case==1) { // if pressing, check xtop and ftop
               if (ScaledPosDiff > xtop) {
                 xtop = ScaledPosDiff;
               }
               if (Id_SSI > ftop) {
                 ftop = Id_SSI;
               }
-              delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
+            } else { // if SSI_case==2, integrate energy
+              Eout = Eout - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
             }
-            if (SSI_case==3) {
-              delO = delO_new; // update delO during case 3
-              Eout = 0.0; // reset parameters
-              xtop = 0.0;
-              ftop = 0.0;
-            }
+            delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
+          }
+
+          if (SSI_case==3) { // now on the input cycle, implement delO
+            delO = delO_new; // update delO during case 3
+            Eout = 0.0; // reset parameters
+            xtop = 0.0;
+            ftop = 0.0;
+          }
 
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
@@ -460,7 +464,7 @@ main(void)
                 Id_SSI = Id_SSI; // no change in Id
               }
             }
-          } else { // in first part of cycle, no offset yet
+          } else { // in first part of cycle (case 1 or 2), no offset yet
             Id_SSI = Ke*ScaledPosDiff; 
           }
 
