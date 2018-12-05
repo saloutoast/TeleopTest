@@ -1,4 +1,4 @@
-% SSI data processing
+% SSI virtual environment data processing
 
 %% load data
 SSI_data = load("Ke3_Kv015.txt"); % Kv = 0.15 A/rad, alpha = 1*Kv, beta = 0.5*Kv, note: if f_SSI>fe, f = fe
