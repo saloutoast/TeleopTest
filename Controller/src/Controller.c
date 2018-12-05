@@ -389,22 +389,7 @@ main(void)
           // SSI calculations
           if (SSI_flag==1) { // calculations for master 1, slave 0
 
-            // energy calculations based on SSI case
-            if ((SSI_case==1)|(SSI_case==2)) {
-              Eout = Eout + (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
-              if (ScaledPosDiff > xtop) {
-                xtop = ScaledPosDiff;
-              }
-              if (Id_SSI > ftop) {
-                ftop = Id_SSI;
-              }
-              delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
-            }
-            if (SSI_case==3) {
-              delO = delO_new; // update delO during case 3
-              Eout = 0;
-            }
-
+            // determine SSI case 
             if (ScaledPosDiff>0.01) { // master is ahead of slave
 
               if (ScaledVelDiff<-0.01) { // slave is catching up to master (releasing cycle)
@@ -423,7 +408,7 @@ main(void)
             } else {
               if (ScaledPosDiff<-0.01) { // slave is ahead of master
 
-                if (ScaledVelDiff>0.01) { // master is catching up to slave ()
+                if (ScaledVelDiff>0.01) { // master is catching up to slave
                   Kinc = Kinc - Kv;
                   SSI_case = 4; // last part of cycle (2nd releasing)
                 } else {  // slave is getting further ahead or velocities are the same
@@ -445,15 +430,38 @@ main(void)
             Kinc = 0.0;
           }
 
-          //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
-          if (ScaledVelDiff>0.01) {
-            Id_SSI = Ke*ScaledPosDiff + delO;
-          } else {
-            if (ScaledVelDiff<0.01) {
-              Id_SSI = Ke*ScaledPosDiff - delO;
-            } else {
-              Id_SSI = Id_SSI;
+          // energy calculations based on SSI case
+            if ((SSI_case==1)|(SSI_case==2)) {
+              Eout = Eout + (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
+              if (ScaledPosDiff > xtop) {
+                xtop = ScaledPosDiff;
+              }
+              if (Id_SSI > ftop) {
+                ftop = Id_SSI;
+              }
+              delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
             }
+            if (SSI_case==3) {
+              delO = delO_new; // update delO during case 3
+              Eout = 0.0; // reset parameters
+              xtop = 0.0;
+              ftop = 0.0;
+            }
+
+          // set desired current, with offset depending on SSI case
+          //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
+          if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
+            if (ScaledVelDiff>0.01) {
+              Id_SSI = Ke*ScaledPosDiff + delO;
+            } else {
+              if (ScaledVelDiff<-0.01) {
+                Id_SSI = Ke*ScaledPosDiff - delO;
+              } else {
+                Id_SSI = Id_SSI; // no change in Id
+              }
+            }
+          } else { // in first part of cycle, no offset yet
+            Id_SSI = Ke*ScaledPosDiff; 
           }
 
           // contact-based controller calculations
