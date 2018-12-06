@@ -293,8 +293,8 @@ main(void)
     //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // vanilla controller values
-    float Kp = 1.0; // Amps/rad
-    float Kd = 0.0; // Amps/rad/sec
+    float Kp = 5.0; // Amps/rad
+    float Kd = 0.5; // Amps/rad/sec
     float Kd_B = 0.0; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
@@ -319,8 +319,8 @@ main(void)
     float beta = 0.0;
     float mu = 0.0;
     float Kv = 0.05; // initial guess, Kv = 2*bm/T
-    float Ke = 1.0; // desired controller stiffness
-    int SSI_flag = 1; // flag for whether SSI is activated
+    float Ke = 5.0; // desired controller stiffness
+    int SSI_flag = 0; // flag for whether SSI is activated
     int SSI_case = 0;
 
     // for dynamics calculations
@@ -389,7 +389,7 @@ main(void)
           // SSI calculations
           if (SSI_flag==1) { // calculations for master 1, slave 0
 
-            // determine SSI case 
+            // determine SSI case
             if (ScaledPosDiff>0.01) { // master is ahead of slave
 
               if (ScaledVelDiff<-0.01) { // slave is catching up to master (releasing cycle)
@@ -454,19 +454,19 @@ main(void)
 
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
-          if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
-            if (ScaledVelDiff>0.01) {
-              Id_SSI = Ke*ScaledPosDiff + delO;
+          //if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
+          if (ScaledVelDiff>0.01) {
+            Id_SSI = Ke*ScaledPosDiff + delO;
+          } else {
+            if (ScaledVelDiff<-0.01) {
+              Id_SSI = Ke*ScaledPosDiff - delO;
             } else {
-              if (ScaledVelDiff<-0.01) {
-                Id_SSI = Ke*ScaledPosDiff - delO;
-              } else {
-                Id_SSI = Id_SSI; // no change in Id
-              }
+              Id_SSI = Id_SSI; // no change in Id
             }
-          } else { // in first part of cycle (case 1 or 2), no offset yet
-            Id_SSI = Ke*ScaledPosDiff; 
           }
+          //} else { // in first part of cycle (case 1 or 2), no offset yet
+          //  Id_SSI = Ke*ScaledPosDiff;
+          //}
 
           // contact-based controller calculations
           // calculate desired current based on tuning parameter alpha and pos/rate difference
@@ -535,8 +535,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)((Ke+Kinc)*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
-          UARTprintf("%d, %d, %d\n", SSI_case, (int)(delO*1000), (int)(Eout*1000));
+          UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
+          //UARTprintf("%d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
