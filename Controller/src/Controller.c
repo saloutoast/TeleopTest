@@ -295,7 +295,7 @@ main(void)
     // vanilla controller values
     float Kp = 1.0; // Amps/rad
     float Kd = 0.0; // Amps/rad/sec
-    float Kd_B = 0.1; // "bonus damping", same units as Kd_B
+    float Kd_B = 0.0; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
     float Id_PD = 0.0;
@@ -304,7 +304,9 @@ main(void)
     float Id_SSI = 0.0;
     float Eout = 0.0;
     float Fslave = 0.0;
+    float delO_new = 0.0;
     float delO = 0.0;
+    float Kinc = 0.0;
     float f = 0.0;
     float fe = 0.0;
     float fp = 0.0;
@@ -316,7 +318,7 @@ main(void)
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
-    float Kv = 0.001; // initial guess, Kv = 2*bm/T
+    float Kv = 0.05; // initial guess, Kv = 2*bm/T
     float Ke = 1.0; // desired controller stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int SSI_case = 0;
@@ -384,29 +386,37 @@ main(void)
           // PD calculations
           Id_PD = Kp*ScaledPosDiff + Kd*ScaledVelDiff;
 
-          // SSI calculations (sort out)
-
-          // maybe have ID calculated in each case, using f=fp+() like with VE
-          // or try delO, calculate change relative to desired force to implement SSI
+          // SSI calculations
           if (SSI_flag==1) { // calculations for master 1, slave 0
 
-            // some energy calculations here?
-            Eout = 0.0;
-            Fslave = 0.0;
+            // energy calculations based on SSI case
+            if ((SSI_case==1)|(SSI_case==2)) {
+              Eout = Eout + (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
+              if (ScaledPosDiff > xtop) {
+                xtop = ScaledPosDiff;
+              }
+              if (Id_SSI > ftop) {
+                ftop = Id_SSI;
+              }
+              delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
+            }
+            if (SSI_case==3) {
+              delO = delO_new; // update delO during case 3
+              Eout = 0;
+            }
 
             if (ScaledPosDiff>0.01) { // master is ahead of slave
 
               if (ScaledVelDiff<-0.01) { // slave is catching up to master (releasing cycle)
-                delO = delO - Kv;
-                SSI_case = 1;
+                Kinc = Kinc - Kv;
+                SSI_case = 2; // second part of cycle (1st releasing)
               } else { // master is getting further ahead (pressing) or velocities are the same
                 //delO = delO + Kv;
                 if (ScaledVelDiff>0.01) {
-                  delO = delO + Kv;
-                  SSI_case = 2;
+                  Kinc = Kinc + Kv;
+                  SSI_case = 1; // start of cycle (1st pressing)
                 } else {
-                  delO = delO;
-                  SSI_case = 3;
+                  Kinc = Kinc;
                 }
               }
 
@@ -414,29 +424,37 @@ main(void)
               if (ScaledPosDiff<-0.01) { // slave is ahead of master
 
                 if (ScaledVelDiff>0.01) { // master is catching up to slave ()
-                  delO = delO - Kv;
-                  SSI_case = 4;
+                  Kinc = Kinc - Kv;
+                  SSI_case = 4; // last part of cycle (2nd releasing)
                 } else {  // slave is getting further ahead or velocities are the same
                   //delO = delO + Kv;
                   if (ScaledVelDiff<-0.01) {
-                    delO = delO + Kv;
-                    SSI_case = 5;
+                    Kinc = Kinc + Kv;
+                    SSI_case = 3; // third part of cycle (2nd pressing)
                   } else {
-                    delO = delO;
-                    SSI_case = 6;
+                    Kinc = Kinc;
                   }
                 }
 
               } else { // positions are the same
-                delO = 0.0;; // reset
-                SSI_case = 7;
+                Kinc = 0.0; // reset
+                SSI_case = 0;
               }
             }
           } else {
-            delO = 0.0;
+            Kinc = 0.0;
           }
 
-          Id_SSI = (Ke+delO)*ScaledPosDiff;
+          //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
+          if (ScaledVelDiff>0.01) {
+            Id_SSI = Ke*ScaledPosDiff + delO;
+          } else {
+            if (ScaledVelDiff<0.01) {
+              Id_SSI = Ke*ScaledPosDiff - delO;
+            } else {
+              Id_SSI = Id_SSI;
+            }
+          }
 
           // contact-based controller calculations
           // calculate desired current based on tuning parameter alpha and pos/rate difference
@@ -505,7 +523,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)((Ke+delO)*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
+          //UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)((Ke+Kinc)*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
+          UARTprintf("%d, %d, %d\n", SSI_case, (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
 
