@@ -302,9 +302,11 @@ main(void)
 
     // SSI controller values
     float Id_SSI = 0.0;
-    float Eout = 0.0;
+    float Eout_A = 0.0;
+    float Eout_B = 0.0;
     float Fslave = 0.0;
-    float delO_new = 0.0;
+    float delO_A = 0.0;
+    float delO_B = 0.0;
     float delO = 0.0;
     float Kinc = 0.0;
     float f = 0.0;
@@ -313,8 +315,10 @@ main(void)
     float fr = 0.0;
     float x = 0.0;
     float xp = 0.0;
-    float xtop = 0.0;
-    float ftop = 0.0;
+    float xtop_A = 0.0;
+    float ftop_A = 0.0;
+    float xtop_B = 0.0;
+    float ftop_B = 0.0;
     float alpha = 0.0;
     float beta = 0.0;
     float mu = 0.0;
@@ -433,23 +437,44 @@ main(void)
           // energy calculations based on SSI case
           if ((SSI_case==1)|(SSI_case==2)) {
             if (SSI_case==1) { // if pressing, check xtop and ftop
-              if (ScaledPosDiff > xtop) {
-                xtop = ScaledPosDiff;
+              if (ScaledPosDiff > xtop_A) {
+                xtop_A = ScaledPosDiff;
               }
-              if (Id_SSI > ftop) {
-                ftop = Id_SSI;
+              if (Id_SSI > ftop_A) {
+                ftop_A = Id_SSI;
               }
             } else { // if SSI_case==2, integrate energy
-              Eout = Eout - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
+              Eout_A = Eout_A - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
             }
-            delO_new = ((2*Eout)/xtop) - ((xtop*ftop)/2);
+            delO_A = ((2*Eout_A)/xtop_A) - ((xtop_A*ftop_A)/2);
+          }
+          
+          if ((SSI_case==3)|(SSI_case==4)) {
+            if (SSI_case==3) { // if pressing, check xtop and ftop
+              if (ScaledPosDiff < xtop_B) {
+                xtop_B = ScaledPosDiff;
+              }
+              if (Id_SSI < ftop_B) {
+                ftop_B = Id_SSI;
+              }
+            } else { // if SSI_case==4, integrate energy
+              Eout_B = Eout_B - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
+            }
+            delO_B = ((2*Eout_B)/xtop_B) - ((xtop_B*ftop_B)/2);
           }
 
-          if (SSI_case==3) { // now on the input cycle, implement delO
-            delO = delO_new; // update delO during case 3
-            Eout = 0.0; // reset parameters
-            xtop = 0.0;
-            ftop = 0.0;
+          if (SSI_case==3) { // now on the second half of the cycle, implement delO_A
+            delO = delO_A; // update delO during case 3
+            Eout_A = 0.0; // reset parameters
+            xtop_A = 0.0;
+            ftop_A = 0.0;
+          }
+
+          if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
+            delO = delO_B; // update delO during case 3
+            Eout_B = 0.0; // reset parameters
+            xtop_B = 0.0;
+            ftop_B = 0.0;
           }
 
           // set desired current, with offset depending on SSI case
