@@ -23,7 +23,44 @@ PD(:,2) = (PD(:,2)/4000)*Imax*kt;
 P(:,2) = (P(:,2)/4000)*Imax*kt;
 P_BD(:,2) = (P_BD(:,2)/4000)*Imax*kt;
 
+% correct 2pi wrapping
+for ii=1:size(SSI,1)
+    if (SSI(ii,3)<1.0)
+        SSI(ii,3) = SSI(ii,3) + 2*pi;
+    end
+end
+for ii=1:size(SSI_BD,1)
+    if (SSI_BD(ii,3)<1.0)
+        SSI_BD(ii,3) = SSI_BD(ii,3) + 2*pi;
+    end
+end
+for ii=1:size(PD,1)
+    if (PD(ii,3)<1.0)
+        PD(ii,3) = PD(ii,3) + 2*pi;
+    end
+end
+for ii=1:size(P,1)
+    if (P(ii,3)<1.0)
+        P(ii,3) = P(ii,3) + 2*pi;
+    end
+end
+for ii=1:size(P_BD,1)
+    if (P_BD(ii,3)<1.0)
+        P_BD(ii,3) = P_BD(ii,3) + 2*pi;
+    end
+end
+
+
 % new data format: [SSI_case, actual current, Pos1, PosDiff, VelDiff, delO, Id_SSI, Id_PD]
+
+%% get some statistics
+
+RASE = zeros(1,5); % [P, PD, P_BD, SSI, SSI_BD]
+RASE(1) = norm(P(:,4));
+RASE(2) = norm(PD(:,4));
+RASE(3) = norm(P_BD(:,4));
+RASE(4) = norm(SSI(:,4));
+RASE(5) = norm(SSI_BD(:,4));
 
 %% plot the plots
 
