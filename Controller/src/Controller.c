@@ -293,8 +293,8 @@ main(void)
     //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // vanilla controller values
-    float Kp = 5.0; // Amps/rad
-    float Kd = 0.5; // Amps/rad/sec
+    float Kp = 10.0; // Amps/rad
+    float Kd = 0.0; // Amps/rad/sec
     float Kd_B = 0.0; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
@@ -323,7 +323,7 @@ main(void)
     float beta = 0.0;
     float mu = 0.0;
     float Kv = 0.05; // initial guess, Kv = 2*bm/T
-    float Ke = 5.0; // desired controller stiffness
+    float Ke = 20.0; // desired controller stiffness
     int SSI_flag = 0; // flag for whether SSI is activated
     int SSI_case = 0;
 
@@ -448,8 +448,8 @@ main(void)
             }
             delO_A = ((2*Eout_A)/xtop_A) - ((xtop_A*ftop_A)/2);
           }
-          
-          if ((SSI_case==3)|(SSI_case==4)) {
+
+          /*if ((SSI_case==3)|(SSI_case==4)) {
             if (SSI_case==3) { // if pressing, check xtop and ftop
               if (ScaledPosDiff < xtop_B) {
                 xtop_B = ScaledPosDiff;
@@ -461,7 +461,7 @@ main(void)
               Eout_B = Eout_B - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
             }
             delO_B = ((2*Eout_B)/xtop_B) - ((xtop_B*ftop_B)/2);
-          }
+          }*/
 
           if (SSI_case==3) { // now on the second half of the cycle, implement delO_A
             delO = delO_A; // update delO during case 3
@@ -470,12 +470,12 @@ main(void)
             ftop_A = 0.0;
           }
 
-          if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
+          /*if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
             delO = delO_B; // update delO during case 3
             Eout_B = 0.0; // reset parameters
             xtop_B = 0.0;
             ftop_B = 0.0;
-          }
+          } */
 
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
@@ -560,7 +560,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000), (int)(Id_SSI*1000), (int)(Id_PD*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
+          //UARTprintf("test\n");
           //UARTprintf("%d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
