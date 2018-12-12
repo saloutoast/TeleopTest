@@ -53,14 +53,88 @@ end
 
 % new data format: [SSI_case, actual current, Pos1, PosDiff, VelDiff, delO, Id_SSI, Id_PD]
 
+%% load and scale second data set
+
+SSI2 = load("SSItest2_SSI_Ke10.txt");
+P2 = load("SSItest2_P_Kp10.txt");
+% data format: [SSI_case, (Pos1raw*(2*M_PI/8192)*1000), (ScaledPosDiff*1000), (ScaledVelDiff*1000), (delO*1000)];
+
+SSI2(:,2:5) = SSI2(:,2:5)/1000;
+P2(:,2:5) = P2(:,2:5)/1000;
+
+for ii=1:size(SSI2,1)
+    if (SSI2(ii,2)<1.0)
+        SSI2(ii,2) = SSI2(ii,2) + 2*pi;
+    end
+end
+for ii=1:size(P2,1)
+    if (P2(ii,2)<1.0)
+        P2(ii,2) = P2(ii,2) + 2*pi;
+    end
+end
+% new data format: [SSI_case, Pos1, PosDiff, VelDiff, delO]
+
+
 %% get some statistics
 
-RASE = zeros(1,5); % [P, PD, P_BD, SSI, SSI_BD]
+RASE = zeros(1,7); % [P, PD, P_BD, P2, SSI, SSI_BD, SSI2]
 RASE(1) = norm(P(:,4));
 RASE(2) = norm(PD(:,4));
 RASE(3) = norm(P_BD(:,4));
-RASE(4) = norm(SSI(:,4));
-RASE(5) = norm(SSI_BD(:,4));
+RASE(4) = norm(P2(:,3));
+RASE(5) = norm(SSI(:,4));
+RASE(6) = norm(SSI_BD(:,4));
+RASE(7) = norm(SSI2(:,3));
+
+%% fft to see frequency domain (what to look for here?)
+
+Fs = 1000; % sampling frequency
+T = 1/Fs; % sampling period
+
+% do this for each dataset
+L = size(SSI,1);
+t = (0:L-1)*T; % time vector
+F_SSI = fft(SSI(:,4)); % fft of position error
+P2 = abs(F_SSI/L);
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1); % frequency response for plotting
+f = Fs*(0:(L/2))/L;
+
+figure;
+plot(f(1:2000),P1(1:2000));
+title("Single-Sided Amplitude Spectrum of PosError for SSI");
+xlabel('f'); ylabel('|P1|');
+
+L = size(P,1);
+t = (0:L-1)*T; % time vector
+F_P = fft(P(:,4)); % fft of position error
+P2 = abs(F_P/L);
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1); % frequency response for plotting
+f = Fs*(0:(L/2))/L;
+
+figure;
+plot(f(1:2000),P1(1:2000));
+title("Single-Sided Amplitude Spectrum of PosError for P");
+xlabel('f'); ylabel('|P1|');
+
+L = size(SSI2,1);
+t = (0:L-1)*T; % time vector
+F_SSI2 = fft(SSI2(:,3)); % fft of position error
+P2 = abs(F_SSI2/L);
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1); % frequency response for plotting
+f = Fs*(0:(L/2))/L;
+
+figure;
+plot(f(1:1000),P1(1:1000));
+title("Single-Sided Amplitude Spectrum of PosError for SSI2");
+xlabel('f'); ylabel('|P1|');
+
+
+
+
+
 
 %% plot the plots
 
@@ -69,6 +143,12 @@ plot(SSI(:,3));
 plot(SSI(:,3)-SSI(:,4));
 hold off;
 title('SSI');
+
+figure; hold on;
+plot(SSI2(:,2));
+plot(SSI2(:,2)-SSI2(:,3));
+hold off;
+title('SSI2');
 
 figure; hold on;
 plot(SSI_BD(:,3));
@@ -93,6 +173,12 @@ plot(P_BD(:,3));
 plot(P_BD(:,3)-P_BD(:,4));
 hold off;
 title('P BD');
+
+figure; hold on;
+plot(P2(:,2));
+plot(P2(:,2)-P2(:,3));
+hold off;
+title('P2');
 
 % figure; hold on; 
 % plot(SSI(:,4)); 
