@@ -84,7 +84,16 @@ RASE(3) = norm(P_BD(:,4));
 RASE(4) = norm(P2(:,3));
 RASE(5) = norm(SSI(:,4));
 RASE(6) = norm(SSI_BD(:,4));
-RASE(7) = norm(SSI2(:,3));
+RASE(7) = norm(SSI2(:,3))
+
+MME = zeros(2,7); % [max;min] x [P, PD, P_BD, P2, SSI, SSI_BD, SSI2]
+MME(:,1) = [max(P(:,4));min(P(:,4))];
+MME(:,2) = [max(PD(:,4));min(PD(:,4))];
+MME(:,3) = [max(P_BD(:,4));min(P_BD(:,4))];
+MME(:,4) = [max(P2(:,3));min(P2(:,3))];
+MME(:,5) = [max(SSI(:,4));min(SSI(:,4))];
+MME(:,6) = [max(SSI_BD(:,4));min(SSI_BD(:,4))];
+MME(:,7) = [max(SSI2(:,3));min(SSI2(:,3))]
 
 %% fft to see frequency domain (what to look for here?)
 
@@ -131,12 +140,11 @@ plot(f(1:1000),P1(1:1000));
 title("Single-Sided Amplitude Spectrum of PosError for SSI2");
 xlabel('f'); ylabel('|P1|');
 
+%% bode plots from estimate of transfer function between master position and slave position
+figure;
+tfestimate(P(:,3)',(P(:,3)-P(:,4))',[],[],[],1000);
 
-
-
-
-
-%% plot the plots
+%% plot position performance
 
 figure; hold on;
 plot(SSI(:,3));
