@@ -293,7 +293,7 @@ main(void)
     //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // vanilla controller values
-    float Kp = 10.0; // Amps/rad
+    float Kp = 5.0; // Amps/rad
     float Kd = 0.0; // Amps/rad/sec
     float Kd_B = 0.0; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
@@ -324,8 +324,14 @@ main(void)
     float mu = 0.0;
     float Kv = 0.05; // initial guess, Kv = 2*bm/T
     float Ke = 20.0; // desired controller stiffness
-    int SSI_flag = 0; // flag for whether SSI is activated
+    int SSI_flag = 1; // flag for whether SSI is activated
     int SSI_case = 0;
+
+    // for master pseudo-position
+    float runtime = 0.0;
+    float omega = 3.14159;
+    float sin_arg = 0.0;
+    float Pos1Pseudo = 0.0;
 
     // for dynamics calculations
     float kt = 19.4; // torque constant in mNm/A
@@ -342,7 +348,7 @@ main(void)
 
     // enable motor drivers just before entering control loop
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
-    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
+    //GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     while(1)
     {
@@ -354,7 +360,22 @@ main(void)
 
           // Get position and velocity values
           Pos0raw = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
-          Pos1raw = QEIPositionGet(QEI1_BASE);
+          //Pos1raw = QEIPositionGet(QEI1_BASE);
+
+          // create master pseudo-position
+          runtime += 0.001;
+          sin_arg = omega*runtime;
+          if (sin_arg>(2*M_PI)) {
+            runtime = 0.0;
+            omega+=0.5;
+            sin_arg = 0.0;
+          }
+          if (omega>126) { // approx 20Hz
+            UARTprintf("Done!\n");
+            omega = 0.0;
+          }
+          Pos1Pseudo = sinf(sin_arg);
+          Pos1raw = (int)((Pos1Pseudo*8192.0/16.0)+4096); // pi/8 radians amplitude
 
           // Calculate control efforts, placing limits on values based on PWM period
           DelPos0raw = Pos0raw - LastPos0raw;
@@ -449,7 +470,7 @@ main(void)
             delO_A = ((2*Eout_A)/xtop_A) - ((xtop_A*ftop_A)/2);
           }
 
-          /*if ((SSI_case==3)|(SSI_case==4)) {
+          if ((SSI_case==3)|(SSI_case==4)) {
             if (SSI_case==3) { // if pressing, check xtop and ftop
               if (ScaledPosDiff < xtop_B) {
                 xtop_B = ScaledPosDiff;
@@ -461,7 +482,7 @@ main(void)
               Eout_B = Eout_B - (Ke*ScaledPosDiff*ScaledVelDiff*0.001);
             }
             delO_B = ((2*Eout_B)/xtop_B) - ((xtop_B*ftop_B)/2);
-          }*/
+          }
 
           if (SSI_case==3) { // now on the second half of the cycle, implement delO_A
             delO = delO_A; // update delO during case 3
@@ -470,12 +491,12 @@ main(void)
             ftop_A = 0.0;
           }
 
-          /*if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
+          if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
             delO = delO_B; // update delO during case 3
             Eout_B = 0.0; // reset parameters
             xtop_B = 0.0;
             ftop_B = 0.0;
-          } */
+          }
 
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
@@ -560,8 +581,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
-          //UARTprintf("test\n");
+          //UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", (int)(omega*1000), (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
           //UARTprintf("%d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
