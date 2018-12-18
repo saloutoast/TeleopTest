@@ -18,6 +18,7 @@ AnalogIn     knob(PC_0);
 DigitalOut  toggle1(PC_3);
 DigitalOut  toggle2(PC_2);
 
+
 ///[[abad1,  abad2]
 ///[hip1,   hip2]
 ///[knee1, knee2]]
@@ -64,7 +65,8 @@ float scaling = 0;
 // SSI values
 float Eout[3];
 float delO[3];
-float SSI_case[3];
+float delOnew[3];
+int SSI_case[3];
 float xtop[3];
 float ftop[3];
 float diffq[3];
@@ -72,7 +74,7 @@ float diffdq[3];
 float tau1_SSI[3];
 float tau2_SSI[3];
 
-int control_mode = 1;
+int control_mode = 3;
 
 /// Value Limits ///
  #define P_MIN -12.5f
@@ -135,13 +137,13 @@ int control_mode = 1;
              }
             }
      }
-
+     
 int checkSSI(int n, const float diffq[3], const float diffdq[3]){
     if (diffq[n]>0) { // master is ahead of slave (1 is master, 2 is slave)
         if (diffdq[n]>0) {
-            return 2;
-        } else {
             return 1;
+        } else {
+            return 2;
         }
     } else {
         if (diffdq[n]>0) {
@@ -150,7 +152,7 @@ int checkSSI(int n, const float diffq[3], const float diffdq[3]){
             return 3;
         }
     }
-}
+}     
  
 /// CAN Command Packet Structure ///
 /// 16 bit position command, between -4*pi and 4*pi
@@ -253,7 +255,7 @@ void WriteAll(){
     can1.write(knee1);
     //wait_us(10);
     can2.write(knee2);
-    wait_us(10);
+     wait_us(10);
     //toggle = 0;
     }
 
@@ -290,7 +292,6 @@ void sendCMD(){
                     //Joint Space Coupling
                     KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
                     KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
-
                     /*
                     float deltaq1 = q2[0] - q1[0];
                     float deltaq2 = q2[1] - q1[1];
@@ -318,7 +319,10 @@ void sendCMD(){
                     pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
                     pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     
-                    //printf("%f    %f\n\r", tau1[1], 10.0f*deltaq2*abs(deltaq2));
+                    
+                    //printf("%d    %d    %d\n\r", (int)(q1[0]*1000), (int)(q1[1]*1000), (int)(q1[2]*1000));
+                    printf("%f\n\r", tau1[2]);
+                    
                     }
                     break;
                 
@@ -405,9 +409,11 @@ void sendCMD(){
                                 if (diffq[j]>xtop[j]) {
                                     xtop[j] = diffq[j];
                                 }
-                                // check ftop as well
+                                if (tau1_SSI[j]>ftop[j]) {
+                                    ftop[j] = tau2_SSI[j];
+                                }
                             } else {
-                                Eout[j] = Eout[j] - (Ke*diffq[j]*diffdq[j]*DT);
+                                Eout[j] = Eout[j] - (Ke*diffq[j]*diffdq[j]*0.0006f);
                             }
                             delOnew[j] = ((2*Eout[j])/xtop[j]) - ((xtop[j]*ftop[j])/2);
                         }
@@ -421,40 +427,48 @@ void sendCMD(){
                     }
 
                     // torques
-                    if (diffdq[0]>0) {
-                        tau1_SSI[0] = -scaling*(Ke*(q2[0] - q1[0]) + delO[0]);
-                        tau2_SSI[0] = scaling*(Ke*(q2[0] - q1[0]) + delO[0]);
+                    if (diffq[0]>0) {
+                        tau1_SSI[0] = -scaling*(Ke*(-diffq[0]) + delO[0]);
+                        tau2_SSI[0] = -scaling*(Ke*(diffq[0]) + delO[0]);
                     } else {
-                        tau1_SSI[0] = -scaling*(Ke*(q2[0] - q1[0]) - delO[0]);
-                        tau2_SSI[0] = scaling*(Ke*(q2[0] - q1[0]) - delO[0]);
+                        tau1_SSI[0] = -scaling*(Ke*(-diffq[0]) - delO[0]);
+                        tau2_SSI[0] = -scaling*(Ke*(diffq[0]) - delO[0]);
                     }
 
-                    if (diffdq[1]>0) {
-                        tau1_SSI[1] = -scaling*(Ke*(q2[1] - q1[1]) + delO[1]);
-                        tau2_SSI[1] = scaling*(Ke*(q2[1] - q1[1]) + delO[1]);
+                    if (diffq[1]>0) {
+                        tau1_SSI[1] = scaling*(Ke*(-diffq[1]) + delO[1]);
+                        tau2_SSI[1] = scaling*(Ke*(diffq[1]) + delO[1]);
                     } else {
-                        tau1_SSI[1] = -scaling*(Ke*(q2[1] - q1[1]) - delO[1]);
-                        tau2_SSI[1] = scaling*(Ke*(q2[1] - q1[1]) - delO[1]);
+                        tau1_SSI[1] = scaling*(Ke*(-diffq[1]) - delO[1]);
+                        tau2_SSI[1] = scaling*(Ke*(diffq[1]) - delO[1]);
                     }
 
-                    if (diffdq[2]>0) {
-                        tau1_SSI[2] = -scaling*((Ke*(q2[2] - q1[2]) + delO[2])/1.5f);
-                        tau2_SSI[2] = scaling*((Ke*(q2[2] - q1[2]) + delO[2])/1.5f);
+                    if (diffq[2]>0) {
+                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) - delO[2])/1.5f), 2.5f), -2.5f);
+                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) + delO[2])/1.5f), 2.5f), -2.5f);
                     } else {
-                        tau1_SSI[2] = -scaling*((Ke*(q2[2] - q1[2]) - delO[2])/1.5f);
-                        tau2_SSI[2] = scaling*((Ke*(q2[2] - q1[2]) - delO[2])/1.5f);
+                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) + delO[2])/1.5f), 2.5f), -2.5f);
+                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) - delO[2])/1.5f), 2.5f), -2.5f);
                     }
                    
                     // pack commands
-                    pack_cmd(&abad1, KD1[0], tau1_SSI[0]); 
-                    pack_cmd(&abad2, KD2[0], tau2_SSI[0]); 
-                    pack_cmd(&hip1, KD1[1], tau1_SSI[1]); 
-                    pack_cmd(&hip2, KD2[1], tau2_SSI[1]); 
-                    pack_cmd(&knee1, KD1[2], tau1_SSI[2]); 
-                    pack_cmd(&knee2, KD2[2], tau2_SSI[2]); 
+                    pack_cmd(&abad1, 0, 0); 
+                    pack_cmd(&abad2, 0, 0); 
+                    pack_cmd(&hip1, 0, 0); 
+                    pack_cmd(&hip2, 0, 0); 
+                    pack_cmd(&knee1, 0, 0); 
+                    pack_cmd(&knee2, 0, 0); 
+                    
+                    
+                    //pack_cmd(&abad1, KD1[0], tau1_SSI[0]); 
+                    //pack_cmd(&abad2, KD2[0], tau2_SSI[0]); 
+                    //pack_cmd(&hip1, KD1[1], tau1_SSI[1]); 
+                    //pack_cmd(&hip2, KD2[1], tau2_SSI[1]); 
+                    //pack_cmd(&knee1, KD1[2], tau1_SSI[2]); 
+                    //pack_cmd(&knee2, KD2[2], tau2_SSI[2]); 
 
-                    // print out values?
-                    //printf("%f    %f    %f\n\r", q1[0], q1[1], q1[2], q2[0], q2[1], q2[2], dq... delO...) ... etc
+                    // print out values
+                    printf("%d    %f    %f\n\r", SSI_case[2], delO[2], tau1_SSI[2]); //q1[0], q1[1], q1[2], q2[0], q2[1], q2[2], dq... delO...) ... etc
 
                     }
                     break;
@@ -473,12 +487,12 @@ void sendCMD(){
                     float deltaq3 = q2[2] - q1[2];
 
                     // quadratic in proportional term
-                    tau1[0] = -scaling*(kp_q*(deltaq1*abs(deltaq1)) + kd_q*(dq2[0] - dq1[0]));
-                    tau2[0] = -scaling*(kp_q*(-(deltaq1*abs(deltaq1))) + kd_q*(dq1[0] - dq2[0]));
-                    tau1[1] = scaling*(kp_q*(deltaq2*abs(deltaq2)) + kd_q*(dq2[1] - dq1[1]));
-                    tau2[1] = scaling*(kp_q*(-(deltaq2*abs(deltaq2))) + kd_q*(dq1[1] - dq2[1]));
-                    tau1[2] = -scaling*((kp_q/1.5f)*(deltaq3*abs(deltaq3)) + (kd_q/2.25f)*(dq2[2] - dq1[2]));
-                    tau2[2] = -scaling*((kp_q/1.5f)*(-(deltaq3*abs(deltaq3))) + (kd_q/2.25f)*(dq1[2] - dq2[2]));
+                    tau1[0] = 0; //-scaling*(kp_q*(deltaq1*abs(deltaq1)) + kd_q*(dq2[0] - dq1[0]));
+                    tau2[0] = 0; //-scaling*(kp_q*(-(deltaq1*abs(deltaq1))) + kd_q*(dq1[0] - dq2[0]));
+                    tau1[1] = 0; //scaling*(kp_q*(deltaq2*abs(deltaq2)) + kd_q*(dq2[1] - dq1[1]));
+                    tau2[1] = 0; //scaling*(kp_q*(-(deltaq2*abs(deltaq2))) + kd_q*(dq1[1] - dq2[1]));
+                    tau1[2] = 0; //-scaling*((kp_q/1.5f)*(deltaq3*abs(deltaq3)) + (kd_q/2.25f)*(dq2[2] - dq1[2]));
+                    tau2[2] = 0; //-scaling*((kp_q/1.5f)*(-(deltaq3*abs(deltaq3))) + (kd_q/2.25f)*(dq1[2] - dq2[2]));
                     
                     pack_cmd(&abad1, KD1[0]+.005f, tau1[0]); 
                     pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
@@ -491,7 +505,7 @@ void sendCMD(){
                     //printf("%f    %f\n\r", tau1[1], 10.0f*deltaq2*abs(deltaq2));
 
                     }
-                    break;
+                    break;         
             }
 
     }
@@ -499,6 +513,8 @@ void sendCMD(){
     
     WriteAll();
     toggle2 = 0;
+    //u = t.read_us() - u;
+    //printf("%d\n\r", u);
     }
     
 void Zero(CANMessage * msg){
@@ -521,6 +537,7 @@ void ExitMotorMode(CANMessage * msg){
     msg->data[2] = 0xFD;
     WriteAll();
     }
+
 void serial_isr(){
      /// handle keyboard commands from the serial terminal ///
      while(pc.readable()){
@@ -528,7 +545,7 @@ void serial_isr(){
         switch(c){
             case(27):
                 loop.detach();
-                printf("\n\r exiting motor mode \n\r");
+                printf("\n\r exiting motor mode \r\n");
                 ExitMotorMode(&abad1);
                 ExitMotorMode(&abad2);
                 ExitMotorMode(&hip1);
@@ -538,7 +555,7 @@ void serial_isr(){
                 enabled = 0;
                 break;
             case('m'):
-                printf("\n\r entering motor mode \n\r");
+                printf("\n\r entering motor mode \r\n");
                 EnterMotorMode(&abad1);
                 EnterMotorMode(&abad2);
                 EnterMotorMode(&hip1);
@@ -556,10 +573,11 @@ void serial_isr(){
                 WriteAll();
                 wait(.5);
                 enabled = 1;
+                printf("\n\r Done! \r\n");
                 loop.attach(&sendCMD, DT);
                 break;
             case('z'):
-                printf("\n\r zeroing \n\r");
+                printf("\n\r zeroing \r\n");
                 Zero(&abad1);
                 can1.write(abad1);
                 Zero(&abad2);
@@ -575,18 +593,23 @@ void serial_isr(){
                 break;
             case('0'):
                 control_mode = 0;
+                printf("\n\r 0 \r\n");
                 break;
             case('1'):
                 control_mode = 1;
+                printf("\n\r 1 \r\n");
                 break;
             case('2'):
                 control_mode = 2;
+                printf("\n\r 2 \r\n");
                 break;
             case('3'):
                 control_mode = 3;
+                printf("\n\r 3 \r\n");
                 break;
             case('4'):
                 control_mode = 4;
+                printf("\n\r 4 \r\n");
                 break;
             }
         }
@@ -604,7 +627,7 @@ int main() {
     can2.attach(&rxISR2);                 // attach 'CAN receive-complete' interrupt handler
     can2.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0); //set up can filter
     
-    printf("\n\r Master\n\r");
+    printf("\n\r Master \r\n");
     //printf("%d\n\r", RX_ID << 18);
     abad1.len = 3;                         //transmit 3 bytes
     abad2.len = 3;                         //transmit 3 bytes
@@ -634,7 +657,7 @@ int main() {
     
     enabled = 1;
     
-    printf("\n\r zeroing \n\r");
+    printf("\n\r zeroing \r\n");
     Zero(&abad1);
     can1.write(abad1);
     Zero(&abad2);
@@ -675,8 +698,10 @@ int main() {
     wait_us(10);
     
     /// End Setup ///
+    //t.start(); 
     
     /// Start control loop interrupt ///
+    printf("\n\r Ready! \r\n");
     loop.attach(&sendCMD, DT);
                 
     while(1) {
