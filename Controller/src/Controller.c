@@ -415,14 +415,14 @@ main(void)
           if (SSI_flag==1) { // calculations for master 1, slave 0
 
             // determine SSI case
-            if (ScaledPosDiff>0.01) { // master is ahead of slave
+            if (ScaledPosDiff>0.0) { // master is ahead of slave
 
-              if (ScaledVelDiff<-0.01) { // slave is catching up to master (releasing cycle)
+              if (ScaledVelDiff<=0.0) { // slave is catching up to master (releasing cycle)
                 Kinc = Kinc - Kv;
                 SSI_case = 2; // second part of cycle (1st releasing)
               } else { // master is getting further ahead (pressing) or velocities are the same
                 //delO = delO + Kv;
-                if (ScaledVelDiff>0.01) {
+                if (ScaledVelDiff>0.0) {
                   Kinc = Kinc + Kv;
                   SSI_case = 1; // start of cycle (1st pressing)
                 } else {
@@ -431,14 +431,14 @@ main(void)
               }
 
             } else {
-              if (ScaledPosDiff<-0.01) { // slave is ahead of master
+              if (ScaledPosDiff<=0.0) { // slave is ahead of master
 
-                if (ScaledVelDiff>0.01) { // master is catching up to slave
+                if (ScaledVelDiff>0.0) { // master is catching up to slave
                   Kinc = Kinc - Kv;
                   SSI_case = 4; // last part of cycle (2nd releasing)
                 } else {  // slave is getting further ahead or velocities are the same
                   //delO = delO + Kv;
-                  if (ScaledVelDiff<-0.01) {
+                  if (ScaledVelDiff<=0.0) {
                     Kinc = Kinc + Kv;
                     SSI_case = 3; // third part of cycle (2nd pressing)
                   } else {
@@ -491,24 +491,25 @@ main(void)
             ftop_A = 0.0;
           }
 
-          if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
+          /*if (SSI_case==1) { // now on the first half of the cycle, implement delO_B
             delO = delO_B; // update delO during case 3
             Eout_B = 0.0; // reset parameters
             xtop_B = 0.0;
             ftop_B = 0.0;
-          }
+          }*/
 
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
           //if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
-          if (ScaledPosDiff>0.01) {
+          if (ScaledPosDiff>0.0) {
             Id_SSI = Ke*ScaledPosDiff + delO;
           } else {
-            if (ScaledPosDiff<-0.01) {
-              Id_SSI = Ke*ScaledPosDiff - delO;
-            } else {
-              Id_SSI = Id_SSI; // no change in Id
-            }
+            Id_SSI = Ke*ScaledPosDiff - delO;
+            //if (ScaledPosDiff<-0.0) {
+            //  Id_SSI = Ke*ScaledPosDiff - delO;
+            //} else {
+            //  Id_SSI = Id_SSI; // no change in Id
+            //}
           }
           //} else { // in first part of cycle (case 1 or 2), no offset yet
           //  Id_SSI = Ke*ScaledPosDiff;
@@ -581,7 +582,7 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, U0-5000, (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
           //UARTprintf("%d, %d, %d, %d, %d\n", (int)(omega*1000), (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
           //UARTprintf("%d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
