@@ -360,7 +360,7 @@ main(void)
 
           // Get position and velocity values
           Pos0raw = QEIPositionGet(QEI0_BASE); // divide by 23 to map to degrees
-          //Pos1raw = QEIPositionGet(QEI1_BASE);
+          Pos1raw = QEIPositionGet(QEI1_BASE);
 
           // create master pseudo-position
           runtime += 0.001;
@@ -375,7 +375,7 @@ main(void)
             omega = 0.0;
           }
           Pos1Pseudo = sinf(sin_arg);
-          Pos1raw = (int)((Pos1Pseudo*8192.0/16.0)+4096); // pi/8 radians amplitude
+          //Pos1raw = (int)((Pos1Pseudo*8192.0/16.0)+4096); // pi/8 radians amplitude
 
           // Calculate control efforts, placing limits on values based on PWM period
           DelPos0raw = Pos0raw - LastPos0raw;
@@ -559,8 +559,8 @@ main(void)
           if (U1 > 8990) { U1 = 8990; }
 
           // set new PWM values
-          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
-          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
+          //PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
+          //PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
           // sample motor current from analog inputs
           ADCIntClear(ADC0_BASE, 1);
@@ -581,8 +581,8 @@ main(void)
 
           // transmit data
           //before = TimerValueGet(TIMER0_BASE, TIMER_A);
-          //UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
-          UARTprintf("%d, %d, %d, %d, %d\n", (int)(omega*1000), (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
+          UARTprintf("%d, %d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
+          //UARTprintf("%d, %d, %d, %d, %d\n", (int)(omega*1000), (int)((float)Pos1raw*(2*M_PI/8.192)), (int)(ScaledPosDiff*1000), (int)(ScaledVelDiff*1000), (int)(delO*1000));
           //UARTprintf("%d, %d, %d, %d\n", SSI_case, (int)(Id_SSI*1000), (int)(delO*1000), (int)(Eout*1000));
           //after = TimerValueGet(TIMER0_BASE, TIMER_A);
           //transmit_time = before - after;
