@@ -61,6 +61,16 @@ float kd_q = 0.8f;
 int enabled = 0;
 float scaling = 0;
 
+// SSI values
+float Eout[3];
+float delO[3];
+float SSI_case[3];
+float xtop[3];
+float ftop[3];
+float diffq[3];
+float diffdq[3];
+float tau1_SSI[3];
+float tau2_SSI[3];
 
 int control_mode = 1;
 
@@ -125,6 +135,22 @@ int control_mode = 1;
              }
             }
      }
+
+int checkSSI(int n, const float diffq[3], const float diffdq[3]){
+    if (diffq[n]>0) { // master is ahead of slave (1 is master, 2 is slave)
+        if (diffdq[n]>0) {
+            return 2;
+        } else {
+            return 1;
+        }
+    } else {
+        if (diffdq[n]>0) {
+            return 4;
+        } else {
+            return 3;
+        }
+    }
+}
  
 /// CAN Command Packet Structure ///
 /// 16 bit position command, between -4*pi and 4*pi
@@ -264,6 +290,7 @@ void sendCMD(){
                     //Joint Space Coupling
                     KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
                     KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
+
                     /*
                     float deltaq1 = q2[0] - q1[0];
                     float deltaq2 = q2[1] - q1[1];
@@ -355,7 +382,116 @@ void sendCMD(){
                     pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     }
                     break;
-            
+                case 3:
+                { 
+                    // SSI controller in joint space
+                    const float Ke = 100.0;
+
+                    // joint space "bonus damping"
+                    KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
+                    KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
+
+                    // diff variables
+                    diffq[0] = q1[0]-q2[0]; diffq[1] = q1[1]-q2[1]; diffq[2] = q1[2]-q2[2];
+                    diffdq[0] = dq1[0]-dq2[0]; diffdq[1] = dq1[1]-dq2[1]; diffdq[2] = dq1[2]-dq2[2];
+
+                    // SSI values
+                    for(int j = 0; j<3; j++) { // determine SSI case
+                        SSI_case[j] = checkSSI(j, diffq, diffdq);
+                    }
+                    for(int j = 0; j<3; j++) { // integrate energy
+                        if (SSI_case[j]==1 | SSI_case[j]==2) {
+                            if (SSI_case[j]==1) {
+                                if (diffq[j]>xtop[j]) {
+                                    xtop[j] = diffq[j];
+                                }
+                                // check ftop as well
+                            } else {
+                                Eout[j] = Eout[j] - (Ke*diffq[j]*diffdq[j]*DT);
+                            }
+                            delOnew[j] = ((2*Eout[j])/xtop[j]) - ((xtop[j]*ftop[j])/2);
+                        }
+
+                        if (SSI_case[j]==3) {
+                            delO[j] = delOnew[j];
+                            Eout[j] = 0.0;
+                            xtop[j] = 0.0;
+                            ftop[j] = 0.0;
+                        }
+                    }
+
+                    // torques
+                    if (diffdq[0]>0) {
+                        tau1_SSI[0] = -scaling*(Ke*(q2[0] - q1[0]) + delO[0]);
+                        tau2_SSI[0] = scaling*(Ke*(q2[0] - q1[0]) + delO[0]);
+                    } else {
+                        tau1_SSI[0] = -scaling*(Ke*(q2[0] - q1[0]) - delO[0]);
+                        tau2_SSI[0] = scaling*(Ke*(q2[0] - q1[0]) - delO[0]);
+                    }
+
+                    if (diffdq[1]>0) {
+                        tau1_SSI[1] = -scaling*(Ke*(q2[1] - q1[1]) + delO[1]);
+                        tau2_SSI[1] = scaling*(Ke*(q2[1] - q1[1]) + delO[1]);
+                    } else {
+                        tau1_SSI[1] = -scaling*(Ke*(q2[1] - q1[1]) - delO[1]);
+                        tau2_SSI[1] = scaling*(Ke*(q2[1] - q1[1]) - delO[1]);
+                    }
+
+                    if (diffdq[2]>0) {
+                        tau1_SSI[2] = -scaling*((Ke*(q2[2] - q1[2]) + delO[2])/1.5f);
+                        tau2_SSI[2] = scaling*((Ke*(q2[2] - q1[2]) + delO[2])/1.5f);
+                    } else {
+                        tau1_SSI[2] = -scaling*((Ke*(q2[2] - q1[2]) - delO[2])/1.5f);
+                        tau2_SSI[2] = scaling*((Ke*(q2[2] - q1[2]) - delO[2])/1.5f);
+                    }
+                   
+                    // pack commands
+                    pack_cmd(&abad1, KD1[0], tau1_SSI[0]); 
+                    pack_cmd(&abad2, KD2[0], tau2_SSI[0]); 
+                    pack_cmd(&hip1, KD1[1], tau1_SSI[1]); 
+                    pack_cmd(&hip2, KD2[1], tau2_SSI[1]); 
+                    pack_cmd(&knee1, KD1[2], tau1_SSI[2]); 
+                    pack_cmd(&knee2, KD2[2], tau2_SSI[2]); 
+
+                    // print out values?
+                    //printf("%f    %f    %f\n\r", q1[0], q1[1], q1[2], q2[0], q2[1], q2[2], dq... delO...) ... etc
+
+                    }
+                    break;
+                
+                case 4: 
+                {
+                    // case for general non-linear gains
+
+                    KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
+                    KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
+
+                    // TODO: make functions or blocks for different non-linear gain calculations
+
+                    float deltaq1 = q2[0] - q1[0];
+                    float deltaq2 = q2[1] - q1[1];
+                    float deltaq3 = q2[2] - q1[2];
+
+                    // quadratic in proportional term
+                    tau1[0] = -scaling*(kp_q*(deltaq1*abs(deltaq1)) + kd_q*(dq2[0] - dq1[0]));
+                    tau2[0] = -scaling*(kp_q*(-(deltaq1*abs(deltaq1))) + kd_q*(dq1[0] - dq2[0]));
+                    tau1[1] = scaling*(kp_q*(deltaq2*abs(deltaq2)) + kd_q*(dq2[1] - dq1[1]));
+                    tau2[1] = scaling*(kp_q*(-(deltaq2*abs(deltaq2))) + kd_q*(dq1[1] - dq2[1]));
+                    tau1[2] = -scaling*((kp_q/1.5f)*(deltaq3*abs(deltaq3)) + (kd_q/2.25f)*(dq2[2] - dq1[2]));
+                    tau2[2] = -scaling*((kp_q/1.5f)*(-(deltaq3*abs(deltaq3))) + (kd_q/2.25f)*(dq1[2] - dq2[2]));
+                    
+                    pack_cmd(&abad1, KD1[0]+.005f, tau1[0]); 
+                    pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
+                    pack_cmd(&hip1, KD1[1]+.005f, tau1[1]); 
+                    pack_cmd(&hip2, KD2[1]+.005f, tau2[1]); 
+                    pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
+                    pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
+                    
+                    
+                    //printf("%f    %f\n\r", tau1[1], 10.0f*deltaq2*abs(deltaq2));
+
+                    }
+                    break;
             }
 
     }
@@ -448,6 +584,9 @@ void serial_isr(){
                 break;
             case('3'):
                 control_mode = 3;
+                break;
+            case('4'):
+                control_mode = 4;
                 break;
             }
         }
