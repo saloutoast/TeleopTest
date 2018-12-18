@@ -501,10 +501,10 @@ main(void)
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
           //if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
-          if (ScaledVelDiff>0.01) {
+          if (ScaledPosDiff>0.01) {
             Id_SSI = Ke*ScaledPosDiff + delO;
           } else {
-            if (ScaledVelDiff<-0.01) {
+            if (ScaledPosDiff<-0.01) {
               Id_SSI = Ke*ScaledPosDiff - delO;
             } else {
               Id_SSI = Id_SSI; // no change in Id
