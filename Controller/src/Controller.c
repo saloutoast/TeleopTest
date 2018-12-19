@@ -555,7 +555,7 @@ main(void)
             U0 = 5000 - (int)(Id_SSI*4000/Imax) - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
             U1 = 5000 + (int)(Id_SSI*4000/Imax);
           } else {
-            U0 = 5000 - (int)(Id_PD*4000/Imax) - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
+            U0 = 5000 - (int)(Id_PD*4000/Imax); // - (int)(Kd_B*ScaledVelDiff*4000/Imax); // add bonus damping to the slave
             U1 = 5000 + (int)(Id_PD*4000/Imax);
           }
 
