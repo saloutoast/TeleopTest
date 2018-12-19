@@ -293,9 +293,9 @@ main(void)
     //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // vanilla controller values
-    float Kp = 5.0; // Amps/rad
-    float Kd = 0.0; // Amps/rad/sec
-    float Kd_B = 0.0; // "bonus damping", same units as Kd_B
+    float Kp = 2.0; // Amps/rad
+    float Kd = 0.1; // Amps/rad/sec
+    float Kd_B = 0.1; // "bonus damping", same units as Kd_B
     float Imax = 1.5;
     float Id = 0.0;
     float Id_PD = 0.0;
@@ -323,7 +323,7 @@ main(void)
     float beta = 0.0;
     float mu = 0.0;
     float Kv = 0.05; // initial guess, Kv = 2*bm/T
-    float Ke = 20.0; // desired controller stiffness
+    float Ke = 4.0; // desired controller stiffness
     int SSI_flag = 1; // flag for whether SSI is activated
     int SSI_case = 0;
 
@@ -348,7 +348,7 @@ main(void)
 
     // enable motor drivers just before entering control loop
     GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_1, GPIO_PIN_1);
-    //GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
+    GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
     while(1)
     {
@@ -375,6 +375,11 @@ main(void)
             omega = 0.0;
           }
           Pos1Pseudo = sinf(sin_arg);
+          //if (runtime < 1.000) {
+          //  Pos1Raw = 4096;
+          //} else {
+          //  Pos1raw = 4096+2048;
+          //}
           //Pos1raw = (int)((Pos1Pseudo*8192.0/16.0)+4096); // pi/8 radians amplitude
 
           // Calculate control efforts, placing limits on values based on PWM period
@@ -501,6 +506,7 @@ main(void)
           // set desired current, with offset depending on SSI case
           //Id_SSI = (Ke+Kinc)*ScaledPosDiff;
           //if ((SSI_case==3)|(SSI_case==4)) { // if in second part of cycle, use most recently calculated delO
+          if (delO<0) { delO = delO * -1; } // make sure delO is positive
           if (ScaledPosDiff>0.0) {
             Id_SSI = Ke*ScaledPosDiff + delO;
           } else {
@@ -560,8 +566,8 @@ main(void)
           if (U1 > 8990) { U1 = 8990; }
 
           // set new PWM values
-          //PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
-          //PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
+          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, U0);
+          PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, U1);
 
           // sample motor current from analog inputs
           ADCIntClear(ADC0_BASE, 1);
