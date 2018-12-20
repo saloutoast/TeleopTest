@@ -424,7 +424,7 @@ void sendCMD(){
                                     ftop[j] = tau2_SSI[j];
                                 }
                             } else {
-                                Eout[j] = Eout[j] - (Ke*diffq[j]*diffdq[j]*0.0006f);
+                                Eout[j] = Eout[j] - (Ke*diffq[j]*diffdq[j]*(float)DT);
                             }
                             delOnew[j] = ((2*Eout[j])/xtop[j]) - ((xtop[j]*ftop[j])/2);
                         }
@@ -724,7 +724,7 @@ int main() {
                 printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)((q1[0]-q2[0])*1000), (int)(tau1[0]*1000), (int)((q1[1]-q2[1])*1000), (int)(tau1[1]*1000), (int)((q1[2]-q2[2])*1000), (int)(tau1[2]*1000));
                 }
             if (control_mode==3) {
-                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(1000*diffq[0]), (int)(1000*tau1_SSI[0]), (int)(1000*diffq[1]), (int)(1000*tau1_SSI[1]), (int)(1000*diffq[2]), (int)(1000*tau1_SSI[2]));           
+                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", (int)(scaling*100), (int)(SSI_case[2]), (int)(1000*q1[2]), (int)(1000*q2[2]), (int)(1000*dq1[2]), (int)(1000*dq2[2]), (int)(1000*delO[2]), (int)(1000*tau1_SSI[2]));           
                 }
             //u = t.read_us() - u;
             newData = 0;
