@@ -1,6 +1,6 @@
 
 #define CAN_ID 0x0
-#define DT .0006
+#define DT .001 // .0006
 #include "mbed.h"
 #include "math_ops.h"
 
@@ -19,6 +19,8 @@ AnalogIn     knob(PC_0);
 DigitalOut  toggle1(PC_3);
 DigitalOut  toggle2(PC_2);
 
+Timer t;
+float u;
 
 ///[[abad1,  abad2]
 ///[hip1,   hip2]
@@ -75,7 +77,7 @@ float diffdq[3];
 float tau1_SSI[3];
 float tau2_SSI[3];
 
-int control_mode = 3;
+int control_mode = 1;
 
 /// Value Limits ///
  #define P_MIN -12.5f
@@ -317,15 +319,15 @@ void sendCMD(){
                     //pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
                     //pack_cmd(&hip1, KD1[1]+.005f, tau1[1]); 
                     //pack_cmd(&hip2, KD2[1]+.005f, tau2[1]); 
-                    //pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
-                    //pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
+                    pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
+                    pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     
                     pack_cmd(&abad1, 0, 0); 
                     pack_cmd(&abad2, 0, 0); 
                     pack_cmd(&hip1, 0, 0); 
                     pack_cmd(&hip2, 0, 0); 
-                    pack_cmd(&knee1, 0, 0); 
-                    pack_cmd(&knee2, 0, 0); 
+                    //pack_cmd(&knee1, 0, 0); 
+                    //pack_cmd(&knee2, 0, 0); 
                     
                     //printf("%d    %d    %d\n\r", (int)(q1[0]*1000), (int)(q1[1]*1000), (int)(q1[2]*1000));
                     //printf("%f  %f\n\r", q1[1]-q2[1], tau1[1]);
@@ -397,10 +399,12 @@ void sendCMD(){
                 { 
                     // SSI controller in joint space
                     const float Ke = 100.0f;
+                    const float Tmax = 1.0f;
+                    const float Tmin = -1.0f;
 
                     // joint space "bonus damping"
-                    KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
-                    KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
+                    KD1[0] = 0.01f;  KD1[1] = 0.01f;  KD1[2] = 0.0066f;
+                    KD2[0] = 0.01f;  KD2[1] = 0.01f;  KD2[2] = 0.0066f;
 
                     // diff variables
                     diffq[0] = q1[0]-q2[0]; diffq[1] = q1[1]-q2[1]; diffq[2] = q1[2]-q2[2];
@@ -435,27 +439,27 @@ void sendCMD(){
 
                     // torques
                     if (diffq[0]>0) {
-                        tau1_SSI[0] = fmaxf(fminf(-scaling*(Ke*(-diffq[0]) - delO[0]), 2.5f), -2.5f);
-                        tau2_SSI[0] = fmaxf(fminf(-scaling*(Ke*(diffq[0]) + delO[0]), 2.5f), -2.5f);
+                        tau1_SSI[0] = fmaxf(fminf(-scaling*(Ke*(-diffq[0]) - delO[0]), Tmax), Tmin);
+                        tau2_SSI[0] = fmaxf(fminf(-scaling*(Ke*(diffq[0]) + delO[0]), Tmax), Tmin);
                     } else {
-                        tau1_SSI[0] = fmaxf(fminf(-scaling*(Ke*(-diffq[0]) + delO[0]), 2.5f), -2.5f);
-                        tau2_SSI[0] = fmaxf(fminf(-scaling*(Ke*(diffq[0]) - delO[0]), 2.5f), -2.5f);
+                        tau1_SSI[0] = fmaxf(fminf(-scaling*(Ke*(-diffq[0]) + delO[0]), Tmax), Tmin);
+                        tau2_SSI[0] = fmaxf(fminf(-scaling*(Ke*(diffq[0]) - delO[0]), Tmax), Tmin);
                     }
 
                     if (diffq[1]>0) {
-                        tau1_SSI[1] = fmaxf(fminf(scaling*(Ke*(-diffq[1]) - delO[1]), 2.5f), -2.5f);
-                        tau2_SSI[1] = fmaxf(fminf(scaling*(Ke*(diffq[1]) + delO[1]), 2.5f), -2.5f);
+                        tau1_SSI[1] = fmaxf(fminf(scaling*(Ke*(-diffq[1]) - delO[1]), Tmax), Tmin);
+                        tau2_SSI[1] = fmaxf(fminf(scaling*(Ke*(diffq[1]) + delO[1]), Tmax), Tmin);
                     } else {
-                        tau1_SSI[1] = fmaxf(fminf(scaling*(Ke*(-diffq[1]) + delO[1]), 2.5f), -2.5f);
-                        tau2_SSI[1] = fmaxf(fminf(scaling*(Ke*(diffq[1]) - delO[1]), 2.5f), -2.5f);
+                        tau1_SSI[1] = fmaxf(fminf(scaling*(Ke*(-diffq[1]) + delO[1]), Tmax), Tmin);
+                        tau2_SSI[1] = fmaxf(fminf(scaling*(Ke*(diffq[1]) - delO[1]), Tmax), Tmin);
                     }
 
                     if (diffq[2]>0) {
-                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) - delO[2])/1.5f), 2.5f), -2.5f);
-                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) + delO[2])/1.5f), 2.5f), -2.5f);
+                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) - delO[2])/1.5f), Tmax/1.5f), Tmin/1.5f);
+                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) + delO[2])/1.5f), Tmax/1.5f), Tmin/1.5f);
                     } else {
-                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) + delO[2])/1.5f), 2.5f), -2.5f);
-                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) - delO[2])/1.5f), 2.5f), -2.5f);
+                        tau1_SSI[2] = fmaxf(fminf(-scaling*((Ke*(-diffq[2]) + delO[2])/1.5f), Tmax/1.5f), Tmin/1.5f);
+                        tau2_SSI[2] = fmaxf(fminf(-scaling*((Ke*(diffq[2]) - delO[2])/1.5f), Tmax/1.5f), Tmin/1.5f);
                     }
                    
                     // pack commands
@@ -463,15 +467,15 @@ void sendCMD(){
                     pack_cmd(&abad2, 0, 0); 
                     pack_cmd(&hip1, 0, 0); 
                     pack_cmd(&hip2, 0, 0); 
-                    pack_cmd(&knee1, 0, 0); 
-                    pack_cmd(&knee2, 0, 0); 
+                    //pack_cmd(&knee1, 0, 0); 
+                    //pack_cmd(&knee2, 0, 0); 
                     
                     //pack_cmd(&abad1, KD1[0], tau1_SSI[0]); 
                     //pack_cmd(&abad2, KD2[0], tau2_SSI[0]); 
                     //pack_cmd(&hip1, KD1[1], tau1_SSI[1]); 
                     //pack_cmd(&hip2, KD2[1], tau2_SSI[1]); 
-                    //pack_cmd(&knee1, KD1[2], tau1_SSI[2]); 
-                    //pack_cmd(&knee2, KD2[2], tau2_SSI[2]); 
+                    pack_cmd(&knee1, KD1[2], tau1_SSI[2]); 
+                    pack_cmd(&knee2, KD2[2], tau2_SSI[2]); 
 
                     // print out values
                     //printf("%f    %f    %f\n\r", diffq[1], delO[1], tau1_SSI[1]); //q1[0], q1[1], q1[2], q2[0], q2[1], q2[2], dq... delO...) ... etc
@@ -715,16 +719,17 @@ int main() {
         
         // print desired data to output
         if (newData == 1) {
+            //u = t.read_us();
             if (control_mode==1) {
-                printf("%d  %d\n\r", (int)((q1[1]-q2[1])*1000), (int)(tau1[1]*1000));
+                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)((q1[0]-q2[0])*1000), (int)(tau1[0]*1000), (int)((q1[1]-q2[1])*1000), (int)(tau1[1]*1000), (int)((q1[2]-q2[2])*1000), (int)(tau1[2]*1000));
                 }
             if (control_mode==3) {
-                printf("%d    %d    %d\n\r", (int)(1000*diffq[1]), (int)(1000*delO[1]), (int)(1000*tau1_SSI[1])); //q1[0], q1[1], q1[2], q2[0], q2[1], q2[2], dq... delO...) ... etc
-                }    
-            newData=0;            
-            }
+                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(1000*diffq[0]), (int)(1000*tau1_SSI[0]), (int)(1000*diffq[1]), (int)(1000*tau1_SSI[1]), (int)(1000*diffq[2]), (int)(1000*tau1_SSI[2]));           
+                }
+            //u = t.read_us() - u;
+            newData = 0;
         
-
+        }
         }
         
     }
