@@ -17,8 +17,8 @@ end
 
 %% stats
 
-SSI_err = mean(SSI_data(:,4)-SSI_data(:,5));
-PD_err = mean(PD_data(:,7));
+SSI_err = norm(SSI_data(:,4)-SSI_data(:,5))/(length(SSI_data(:,4)));
+PD_err = norm(PD_data(:,7))/(length(PD_data(:,7)));
 
 %% plots
 

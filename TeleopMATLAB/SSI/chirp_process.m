@@ -21,7 +21,7 @@ SSIbd_data = SSIbd_data/1000;
 
 %% get statistics
 % statistics [MSE, max err, min err] x [P, PD, SSI, SSIbd, SSI2]
-stats = [norm(P_data(:,3)), norm(PD_data(:,3)), norm(SSI_data(:,3)), norm(SSIbd_data(:,3)), norm(SSI2_data(:,3));
+stats = [norm(P_data(:,3))/length(P_data(:,3)), norm(PD_data(:,3))/length(PD_data(:,3)), norm(SSI_data(:,3))/length(SSI_data(:,3)), norm(SSIbd_data(:,3))/length(SSIbd_data(:,3)), norm(SSI2_data(:,3))/length(SSI2_data(:,3));
          max(P_data(:,3)), max(PD_data(:,3)), max(SSI_data(:,3)), max(SSIbd_data(:,3)), max(SSI2_data(:,3));
          min(P_data(:,3)), min(PD_data(:,3)), min(SSI_data(:,3)), min(SSIbd_data(:,3)), min(SSI2_data(:,3))];
 
@@ -30,31 +30,31 @@ stats = [norm(P_data(:,3)), norm(PD_data(:,3)), norm(SSI_data(:,3)), norm(SSIbd_
 figure;
 
 to_plot = SSIbd_data;
-subplot(3,1,3); hold on;
-plot(time(1:size(to_plot,1)),to_plot(:,2));
-plot(time(1:size(to_plot,1)),to_plot(:,2)-to_plot(:,3));
+subplot(2,1,2); hold on;
+plot(time(20000:22000),to_plot(20000:22000,2));
+plot(time(20000:22000),to_plot(20000:22000,2)-to_plot(20000:22000,3));
 hold off; ylim([2.5, 4]);
 title("SSI w/ bonus damping"); legend('Master','Slave');
 
 to_plot = PD_data;
-subplot(3,1,2); hold on;
-plot(time(1:size(to_plot,1)),to_plot(:,2));
-plot(time(1:size(to_plot,1)),to_plot(:,2)-to_plot(:,3));
+subplot(2,1,1); hold on;
+plot(time(20000:22000),to_plot(20000:22000,2));
+plot(time(20000:22000),to_plot(20000:22000,2)-to_plot(20000:22000,3));
 hold off; ylim([2.5, 4]);
 title("PD"); legend('Master','Slave');
 
-to_plot = P_data;
-subplot(3,1,1); hold on;
-plot(time(1:size(to_plot,1)),to_plot(:,2));
-plot(time(1:size(to_plot,1)),to_plot(:,2)-to_plot(:,3));
-hold off; ylim([2.5, 4]);
-title("P only"); legend('Master','Slave');
+% to_plot = P_data;
+% subplot(3,1,1); hold on;
+% plot(time(1:size(to_plot,1)),to_plot(:,2));
+% plot(time(1:size(to_plot,1)),to_plot(:,2)-to_plot(:,3));
+% hold off; ylim([2.5, 4]);
+% title("P only"); legend('Master','Slave');
 
-figure; hold on;
-plot(time(1:size(P_data,1)),P_data(:,3));
-plot(time(1:size(PD_data,1)),PD_data(:,3));
-plot(time(1:size(SSIbd_data,1)),SSIbd_data(:,3));
-hold off; title("Pos Errors"); legend('P only','PD','SSI w/ BD');
+% figure; hold on;
+% plot(time(1:size(P_data,1)),P_data(:,3));
+% plot(time(1:size(PD_data,1)),PD_data(:,3));
+% plot(time(1:size(SSIbd_data,1)),SSIbd_data(:,3));
+% hold off; title("Pos Errors"); legend('P only','PD','SSI w/ BD');
 
 %% plot freq response of P, PD, and SSI
 
