@@ -2,7 +2,7 @@
 
 %% import and organize data
 
-test = importdata("../../3DOF_controller/Logs/141607_01_22_2019.log");
+test = importdata("../../3DOF_controller/Logs/150656_01_22_2019.log");
 
 % only want data from when scaling column is at desired value
 % data is: time, q1[1], q2[1], tau2[1], q1[2], q2[2], tau2[2]
@@ -146,7 +146,5 @@ PDerr = [mean(abs(PD(1:9000,2)-PD(1:9000,3))), mean(abs(PD(1:9000,5)-PD(1:9000,6
 
 SSIerr = [mean(abs(SSI(1:10000,2)-SSI(1:10000,3))), mean(abs(SSI(1:10000,5)-SSI(1:10000,6)))];
 
-SSIerr2 = [mean(abs(SSI(10000:end,2)-SSI(10000:end,3))), mean(abs(SSI(10000:end,5)-SSI(10000:end,6)))];
-
-disp(PDerr); disp(SSIerr); disp(SSIerr2);
+disp(PDerr); disp(SSIerr);
 
