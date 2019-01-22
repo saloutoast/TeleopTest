@@ -2,9 +2,9 @@
 
 %% import and organize data
 
-test = importdata("../../3DOF_controller/Logs/165449_01_15_2019.log");
+test = importdata("../../3DOF_controller/Logs/141607_01_22_2019.log");
 
-% only want data from when scaling column is at 25
+% only want data from when scaling column is at desired value
 % data is: time, q1[1], q2[1], tau2[1], q1[2], q2[2], tau2[2]
 tPD = 0;
 tSSI = 0;
@@ -12,11 +12,11 @@ jj = 1;
 kk = 1;
 
 for ii = 1:size(test,1)
-    if ((test(ii,1)==1)&&(test(ii,2)==25))
+    if ((test(ii,1)==1)) %&&(test(ii,2)==50))
         PD(jj,:) = [tPD, test(ii,3:end)/1000];
         tPD = tPD + 0.001;
         jj = jj + 1;
-    elseif ((test(ii,1)==3)&&(test(ii,2)==25))
+    elseif ((test(ii,1)==3))%&&(test(ii,2)==50))
         SSI(kk,:) = [tSSI, test(ii,3:end)/1000];
         tSSI = tSSI + 0.001;
         kk = kk + 1;
@@ -56,28 +56,28 @@ SSI_cart = [Lhip*c1, Lhip*s1, (Lhip*c1 + Lknee*c12), (Lhip*s1 + Lknee*s12)]; % [
 %% animation for both with circle motion
 
 % maybe a live animation of trajectory would be good, as well as error plots and statistics
-vid = VideoWriter('MC_PDcycle.avi');
-open(vid)
-fig1 = figure;
-for ii=1:10:10000
-    plot([0,PD_cart(ii,1),PD_cart(ii,5)],[0,PD_cart(ii,3),PD_cart(ii,7)], ...
-        [0,PD_cart(ii,2),PD_cart(ii,6)],[0,PD_cart(ii,4),PD_cart(ii,8)]);
-    axis equal
-    xlim([-0.4, 0.1]);
-    ylim([-0.1, 0.4]);
-    title('PD');
-    xlabel('x (m)');
-    ylabel('y (m)');
-    drawnow
-    F = getframe(fig1);
-    writeVideo(vid,F.cdata(:,:,:));
-end
-close(vid);
+% vid = VideoWriter('MC_PDcycle.avi');
+% open(vid)
+% fig1 = figure;
+% for ii=1:10:size(PD_cart,1)
+%     plot([0,PD_cart(ii,1),PD_cart(ii,5)],[0,PD_cart(ii,3),PD_cart(ii,7)], ...
+%         [0,PD_cart(ii,2),PD_cart(ii,6)],[0,PD_cart(ii,4),PD_cart(ii,8)]);
+%     axis equal
+%     xlim([-0.4, 0.1]);
+%     ylim([-0.1, 0.4]);
+%     title('PD');
+%     xlabel('x (m)');
+%     ylabel('y (m)');
+%     drawnow
+% %     F = getframe(fig1);
+% %     writeVideo(vid,F.cdata(:,:,:));
+% end
+% close(vid);
 
-vid = VideoWriter('MC_SSIcycle.avi');
-open(vid);
+% vid = VideoWriter('MC_SSIcycle.avi');
+% open(vid);
 fig2 = figure;
-for ii=1:10:10000
+for ii=16000:10:size(SSI_cart,1)
     plot([0,SSI_cart(ii,1),SSI_cart(ii,5)],[0,SSI_cart(ii,3),SSI_cart(ii,7)], ...
         [0,SSI_cart(ii,2),SSI_cart(ii,6)],[0,SSI_cart(ii,4),SSI_cart(ii,8)]);
     axis equal
@@ -87,66 +87,54 @@ for ii=1:10:10000
     xlabel('x (m)');
     ylabel('y (m)');
     drawnow
-    F = getframe(fig2);
-    writeVideo(vid,F.cdata(:,:,:));
+%     F = getframe(fig2);
+%     writeVideo(vid,F.cdata(:,:,:));
 end
-close(vid);
+% close(vid);
 
 %% animation for SSI with jerky motion
 
-vid = VideoWriter('MC_SSIjerk.avi');
-open(vid);
-fig = figure;
-for ii= 10000:10:size(SSI_cart,1)
-    plot([0,SSI_cart(ii,1),SSI_cart(ii,5)],[0,SSI_cart(ii,3),SSI_cart(ii,7)], ...
-        [0,SSI_cart(ii,2),SSI_cart(ii,6)],[0,SSI_cart(ii,4),SSI_cart(ii,8)]);
-    axis equal
-    xlim([-0.4, 0.1]);
-    ylim([-0.1, 0.4]);
-    %legend('M','S');
-    title('SSI');
-    xlabel('x (m)');
-    ylabel('y (m)');
-    drawnow
-    F = getframe(fig);
-    writeVideo(vid,F.cdata(:,:,:));
-end
-close(vid)
+% vid = VideoWriter('MC_SSIjerk.avi');
+% open(vid);
+% fig = figure;
+% for ii= 10000:10:size(SSI_cart,1)
+%     plot([0,SSI_cart(ii,1),SSI_cart(ii,5)],[0,SSI_cart(ii,3),SSI_cart(ii,7)], ...
+%         [0,SSI_cart(ii,2),SSI_cart(ii,6)],[0,SSI_cart(ii,4),SSI_cart(ii,8)]);
+%     axis equal
+%     xlim([-0.4, 0.1]);
+%     ylim([-0.1, 0.4]);
+%     %legend('M','S');
+%     title('SSI');
+%     xlabel('x (m)');
+%     ylabel('y (m)');
+%     drawnow
+%     F = getframe(fig);
+%     writeVideo(vid,F.cdata(:,:,:));
+% end
+% close(vid)
 
 %% static plots
 
 figure;
-plot(PD(1:10000,1),PD(1:10000,2)-PD(1:10000,3),PD(1:10000,1),PD(1:10000,5)-PD(1:10000,6));
+plot(PD(:,1),PD(:,2)-PD(:,3),PD(:,1),PD(:,5)-PD(:,6));
 legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Position (rad)');
 title('PD position');
 
 figure;
-plot(SSI(1:10000,1), SSI(1:10000,2)-SSI(1:10000,3), SSI(1:10000,1), SSI(1:10000,5)-SSI(1:10000,6));
+plot(SSI(:,1), SSI(:,2)-SSI(:,3), SSI(:,1), SSI(:,5)-SSI(:,6));
 legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Position (rad)');
 title('SSI position');
 
 figure;
-plot(SSI(10000:end,1),SSI(10000:end,2)-SSI(10000:end,3),SSI(10000:end,1),SSI(10000:end,5)-SSI(10000:end,6));
-legend('Hip','Knee');
-xlabel('Time (s)'); ylabel('Position (rad)');
-title('SSI position');
-
-figure;
-plot(PD(1:10000,1),PD(1:10000,4),PD(1:10000,1),PD(1:10000,7));
+plot(PD(:,1),PD(:,4),PD(:,1),PD(:,7));
 legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Torque (Nm)');
 title('PD slave force');
 
 figure;
-plot(SSI(1:10000,1),SSI(1:10000,4),SSI(1:10000,1),SSI(1:10000,7));
-legend('Hip','Knee');
-xlabel('Time (s)'); ylabel('Torque (Nm)');
-title('SSI slave force');
-
-figure;
-plot(SSI(10000:end,1),SSI(10000:end,4),SSI(10000:end,1),SSI(10000:end,7));
+plot(SSI(:,1),SSI(:,4),SSI(:,1),SSI(:,7));
 legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Torque (Nm)');
 title('SSI slave force');
