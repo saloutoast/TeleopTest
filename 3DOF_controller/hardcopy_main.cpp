@@ -1,4 +1,3 @@
-
 #define CAN_ID 0x0
 #define DT .001 // .0006
 #include "mbed.h"
@@ -60,8 +59,8 @@ const float offset[3] = {0.0f, 3.493f, -2.766f}; //Joint angle offsets at zero p
 
 float kp = 800.0f;
 float kd = 100.0f;
-float kp_q = 100.0f;
-float kd_q = 0.8f;
+float kp_q = 200.0f;
+float kd_q = 1.5f;
 int enabled = 0;
 float scaling = 0;
 
@@ -308,8 +307,8 @@ void sendCMD(){
                     tau2[2] = -scaling*((kp_q/1.5f)*(-(deltaq3+1000.0f*deltaq3*abs(deltaq3))) + (kd_q/2.25f)*(dq1[2] - dq2[2]));
                     */
                     
-                    tau1[0] = -scaling*(kp_q*(q2[0] - q1[0]) + kd_q*(dq2[0] - dq1[0]));
-                    tau2[0] = -scaling*(kp_q*(q1[0] - q2[0]) + kd_q*(dq1[0] - dq2[0]));
+                    tau1[0] = -scaling*(100.0f*(q2[0] - q1[0]) + 0.8f*(dq2[0] - dq1[0]));
+                    tau2[0] = -scaling*(100.0f*(q1[0] - q2[0]) + 0.8f*(dq1[0] - dq2[0]));
                     tau1[1] = scaling*(kp_q*(q2[1] - q1[1]) + kd_q*(dq2[1] - dq1[1]));
                     tau2[1] = scaling*(kp_q*(q1[1] - q2[1]) + kd_q*(dq1[1] - dq2[1]));
                     tau1[2] = -scaling*((kp_q/1.5f)*(q2[2] - q1[2]) + (kd_q/2.25f)*(dq2[2] - dq1[2]));
@@ -317,8 +316,8 @@ void sendCMD(){
                     
                     pack_cmd(&abad1, KD1[0]+.005f, tau1[0]); 
                     pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
-                    pack_cmd(&hip1, KD1[1]+.005f, tau1[1]); 
-                    pack_cmd(&hip2, KD2[1]+.005f, tau2[1]); 
+                    pack_cmd(&hip1, KD1[1]+.02f, tau1[1]); 
+                    pack_cmd(&hip2, KD2[1]+.02f, tau2[1]); 
                     pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
                     pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     
@@ -398,16 +397,16 @@ void sendCMD(){
                 case 3:
                 { 
                     // SSI controller in joint space
-                    const float Ke = 100.0f;
-                    const float Ke_d = 0.8f;
-                    const float Tmax = 1.0f;
-                    const float Tmin = -1.0f;
+                    const float Ke = 200.0f;
+                    const float Ke_d = 1.5f;
+                    const float Tmax = 3.0f;
+                    const float Tmin = -3.0f;
                     const float Omax = 1.0f;
                     const float Omin = -1.0f;
 
                     // joint space "bonus damping"
-                    KD1[0] = 0.005f;  KD1[1] = 0.005f;  KD1[2] = 0.0033f;
-                    KD2[0] = 0.005f;  KD2[1] = 0.005f;  KD2[2] = 0.0033f;
+                    KD1[0] = 0.005f;  KD1[1] = 0.02f;  KD1[2] = 0.0033f;
+                    KD2[0] = 0.005f;  KD2[1] = 0.02f;  KD2[2] = 0.0033f;
 
                     // diff variables
                     diffq[0] = q1[0]-q2[0]; diffq[1] = q1[1]-q2[1]; diffq[2] = q1[2]-q2[2];
@@ -440,7 +439,6 @@ void sendCMD(){
                         }
                     }
                     
-
                     // torques
                     delO[0] = 0; // just do PD on ab-ad motor
                     if (diffq[0]>0) { // or diffdq?
@@ -474,6 +472,10 @@ void sendCMD(){
                     //pack_cmd(&hip2, 0, 0); 
                     //pack_cmd(&knee1, 0, 0); 
                     //pack_cmd(&knee2, 0, 0); 
+                    
+                    // take away SSI on ab-ad DOF
+                    tau1_SSI[0] = -scaling*(100.0f*(q2[0] - q1[0]) + 0.8f*(dq2[0] - dq1[0]));
+                    tau2_SSI[0] = -scaling*(100.0f*(q1[0] - q2[0]) + 0.8f*(dq1[0] - dq2[0]));
                     
                     pack_cmd(&abad1, KD1[0], tau1_SSI[0]); 
                     pack_cmd(&abad2, KD2[0], tau2_SSI[0]); 
