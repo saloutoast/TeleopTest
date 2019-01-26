@@ -3,6 +3,7 @@
 %% import and organize data
 
 test = importdata("../../3DOF_controller/Logs/154113_01_24_2019.log");
+test2 = importdata("../../3DOF_controller/Logs/151432_01_24_2019.log");
 
 % only want data from when scaling column is at desired value
 % data is: time, q1[1], q2[1], tau2[1], q1[2], q2[2], tau2[2]
@@ -18,6 +19,23 @@ for ii = 1:size(test,1)
         jj = jj + 1;
     elseif ((test(ii,1)==3))%&&(test(ii,2)==50))
         SSI(kk,:) = [tSSI, test(ii,3:end)/1000, test(ii,2)/100];
+        tSSI = tSSI + 0.001;
+        kk = kk + 1;
+    end        
+end
+
+tPD = 0;
+tSSI = 0;
+jj = 1;
+kk = 1;
+
+for ii = 1:size(test2,1)
+    if ((test2(ii,1)==1)) %&&(test(ii,2)==50))
+        PD2(jj,:) = [tPD, test2(ii,3:end)/1000, test2(ii,2)/100];
+        tPD = tPD + 0.001;
+        jj = jj + 1;
+    elseif ((test2(ii,1)==3))%&&(test(ii,2)==50))
+        SSI2(kk,:) = [tSSI, test2(ii,3:end)/1000, test2(ii,2)/100];
         tSSI = tSSI + 0.001;
         kk = kk + 1;
     end        
@@ -148,12 +166,52 @@ xlabel('Time (s)');
 % xlabel('Time (s)');
 
 
-%% stats
+%% for velocities...
 
-% average error:
-PDerr = [mean(abs(PD(1:9000,2)-PD(1:9000,3))), mean(abs(PD(1:9000,5)-PD(1:9000,6)))];
+PDvel = [0,0,0,0];
+for ii=2:size(PD2,1)
+    PDvel(ii,:) = (1/0.001)*[PD2(ii,2)-PD2(ii-1,2), PD2(ii,3)-PD2(ii-1,3), PD2(ii,5)-PD2(ii-1,5), PD2(ii,6)-PD2(ii-1,6)];
+end
 
-SSIerr = [mean(abs(SSI(1:10000,2)-SSI(1:10000,3))), mean(abs(SSI(1:10000,5)-SSI(1:10000,6)))];
+delv2 = PDvel(:,1)-PDvel(:,2);
 
-disp(PDerr); disp(SSIerr);
+std(delv2(1:12000))
+std(delv2(12000:22000))
 
+% figure;
+% subplot(3,1,1);
+% plot(PD2(:,1),PDvel(:,1),PD2(:,1),PDvel(:,2));
+% subplot(3,1,2);
+% plot(PD2(:,1),delv2);
+% subplot(3,1,3);
+% plot(PD2(:,1),PD2(:,8));
+
+delv = PD(:,2)-PD(:,3);
+
+std(delv(1:7500))
+std(delv(10000:26000))
+
+filt_vel = [PD(1,2),PD(1,3),PD(1,5),PD(1,6)];
+for ii=2:length(delv)
+    filt_vel(ii,:) = 0.5*filt_vel(ii-1,:) + 0.5*([PD(ii,2),PD(ii,3),PD(ii,5),PD(ii,6)]);
+    
+%     if ii<=10
+%         filt_vel(ii,:) = [PD(ii,2),PD(ii,3),PD(ii,5),PD(ii,6)];
+%     else
+%         filt_vel(ii,:) = 0.1 * (sum(filt_vel(ii-9:ii-1,:),1) + [PD(ii,2),PD(ii,3),PD(ii,5),PD(ii,6)]);
+%     end
+    
+end
+
+figure;
+subplot(3,1,1);
+plot(PD(:,1),PD(:,2),PD(:,1),PD(:,3));
+subplot(3,1,2);
+plot(PD(:,1),delv,PD(:,1),filt_vel(:,1)-filt_vel(:,2));
+subplot(3,1,3);
+plot(PD(:,1),PD(:,8));
+
+filt_delv = filt_vel(:,1)-filt_vel(:,2);
+
+std(filt_delv(1:7500))
+std(filt_delv(10000:26000))
