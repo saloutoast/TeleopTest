@@ -2,8 +2,10 @@
 
 %% import and organize data
 
-test = importdata("../../3DOF_controller/Logs/154113_01_24_2019.log");
-test2 = importdata("../../3DOF_controller/Logs/151432_01_24_2019.log");
+clear all
+
+test = importdata("../../3DOF_controller/Logs/151704_01_29_2019.log");
+% test2 = importdata("../../3DOF_controller/Logs/141313_01_29_2019.log");
 
 % only want data from when scaling column is at desired value
 % data is: time, q1[1], q2[1], tau2[1], q1[2], q2[2], tau2[2]
@@ -24,33 +26,36 @@ for ii = 1:size(test,1)
     end        
 end
 
-tPD = 0;
-tSSI = 0;
-jj = 1;
-kk = 1;
-
-for ii = 1:size(test2,1)
-    if ((test2(ii,1)==1)) %&&(test(ii,2)==50))
-        PD2(jj,:) = [tPD, test2(ii,3:end)/1000, test2(ii,2)/100];
-        tPD = tPD + 0.001;
-        jj = jj + 1;
-    elseif ((test2(ii,1)==3))%&&(test(ii,2)==50))
-        SSI2(kk,:) = [tSSI, test2(ii,3:end)/1000, test2(ii,2)/100];
-        tSSI = tSSI + 0.001;
-        kk = kk + 1;
-    end        
-end
+% tPD = 0;
+% tSSI = 0;
+% jj = 1;
+% kk = 1;
+% 
+% for ii = 1:size(test2,1)
+%     if ((test2(ii,1)==1)) %&&(test(ii,2)==50))
+%         PD2(jj,:) = [tPD, test2(ii,3:end)/1000, test2(ii,2)/100];
+%         tPD = tPD + 0.001;
+%         jj = jj + 1;
+%     elseif ((test2(ii,1)==3))%&&(test(ii,2)==50))
+%         SSI2(kk,:) = [tSSI, test2(ii,3:end)/1000, test2(ii,2)/100];
+%         tSSI = tSSI + 0.001;
+%         kk = kk + 1;
+%     end        
+% end
 
 %% add cartesian coords of end effector
 
 Lhip = 0.2088;
 Lknee = 0.175;
 
+PD(:,5) = -PD(:,5)+(2*-2.766);
+PD(:,6) = -PD(:,6)+(2*-2.766);
+
 s1 = [sin(PD(:,2)), sin(PD(:,3))]; % [sin(q1[1]), sin(q2[1])]
-s2 = [sin(-PD(:,5)+(pi/6)), sin(-PD(:,6)+(pi/6))]; % [sin(q1[2]), sin(q2[2])]
+s2 = [sin(PD(:,5)), sin(PD(:,6))]; % [sin(q1[2]), sin(q2[2])]
 
 c1 = [cos(PD(:,2)), cos(PD(:,3))];
-c2 = [cos(-PD(:,5)+(pi/6)), cos(-PD(:,6)+(pi/6))];
+c2 = [cos(PD(:,5)), cos(PD(:,6))];
      
 c12 = c1.*c2 - s1.*s2;
 s12 = s1.*c2 + c1.*s2;
@@ -58,11 +63,14 @@ s12 = s1.*c2 + c1.*s2;
 % End effector position
 PD_cart = [Lhip*c1, Lhip*s1, (Lhip*c1 + Lknee*c12), (Lhip*s1 + Lknee*s12)]; % [xk1, xk2, yk1, yk2, xe1, xe2, ye1, ye2]
  
+SSI(:,5) = -SSI(:,5)+(2*-2.766);
+SSI(:,6) = -SSI(:,6)+(2*-2.766);
+
 s1 = [sin(SSI(:,2)), sin(SSI(:,3))]; % [sin(q1[1]), sin(q2[1])]
-s2 = [sin(-SSI(:,5)+(pi/6)), sin(-SSI(:,6)+(pi/6))]; % [sin(q1[2]), sin(q2[2])]
+s2 = [sin(SSI(:,5)), sin(SSI(:,6))]; % [sin(q1[2]), sin(q2[2])]
 
 c1 = [cos(SSI(:,2)), cos(SSI(:,3))];
-c2 = [cos(-SSI(:,5)+(pi/6)), cos(-SSI(:,6)+(pi/6))];
+c2 = [cos(SSI(:,5)), cos(SSI(:,6))];
      
 c12 = c1.*c2 - s1.*s2;
 s12 = s1.*c2 + c1.*s2;
@@ -110,60 +118,61 @@ end
 % end
 % close(vid);
 
-%% animation for SSI with jerky motion
-
-% vid = VideoWriter('MC_SSIjerk.avi');
-% open(vid);
-% fig = figure;
-% for ii= 10000:10:size(SSI_cart,1)
-%     plot([0,SSI_cart(ii,1),SSI_cart(ii,5)],[0,SSI_cart(ii,3),SSI_cart(ii,7)], ...
-%         [0,SSI_cart(ii,2),SSI_cart(ii,6)],[0,SSI_cart(ii,4),SSI_cart(ii,8)]);
-%     axis equal
-%     xlim([-0.4, 0.1]);
-%     ylim([-0.1, 0.4]);
-%     %legend('M','S');
-%     title('SSI');
-%     xlabel('x (m)');
-%     ylabel('y (m)');
-%     drawnow
-%     F = getframe(fig);
-%     writeVideo(vid,F.cdata(:,:,:));
-% end
-% close(vid)
-
 %% static plots
 
+% figure;
+% subplot(3,1,1);
+% plot(PD(:,1),PD(:,2)-PD(:,3),PD(:,1),PD(:,5)-PD(:,6));
+% legend('Hip','Knee');
+% xlabel('Time (s)'); ylabel('Position (rad)');ylim([-1, 1]);
+% title('PD position');
+% subplot(3,1,2);
+% plot(PD(:,1),PD(:,4),PD(:,1),PD(:,7));
+% legend('Hip','Knee');
+% xlabel('Time (s)'); ylabel('Torque (Nm)');
+% title('PD slave force');
+% subplot(3,1,3);
+% plot(PD(:,1),PD(:,8));
+% title('Gain Scaling');
+% xlabel('Time (s)');
+
 figure;
-subplot(3,1,1);
-plot(PD(:,1),PD(:,2)-PD(:,3),PD(:,1),PD(:,5)-PD(:,6));
+subplot(4,1,1)
+plot(SSI(:,1), SSI(:,2), SSI(:,1), SSI(:,5));
 legend('Hip','Knee');
-xlabel('Time (s)'); ylabel('Position (rad)');ylim([-1, 1]);
-title('PD velocity');
-subplot(3,1,2);
-plot(PD(:,1),PD(:,4),PD(:,1),PD(:,7));
+xlabel('Time (s)'); ylabel('Position (rad)'); ylim([-.1, .1]);
+title('SSI position');
+subplot(4,1,2);
+plot(SSI(:,1),SSI(:,3),SSI(:,1),SSI(:,6));
 legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Torque (Nm)');
-title('PD slave force');
-subplot(3,1,3);
-plot(PD(:,1),PD(:,8));
+title('SSI delO');
+subplot(4,1,3);
+plot(SSI(:,1),SSI(:,4),SSI(:,1),SSI(:,4)-SSI(:,3),SSI(:,1),SSI(:,7),SSI(:,1),SSI(:,7)+SSI(:,6));
+legend('Hip','Hip no delO','Knee','Knee no delO');
+xlabel('Time (s)'); ylabel('Torque (Nm)');
+title('SSI slave force');
+subplot(4,1,4);
+plot(SSI(:,1),SSI(:,8));
 title('Gain Scaling');
 xlabel('Time (s)');
 
 % figure;
 % subplot(3,1,1)
-% plot(SSI(:,1), SSI(:,2)-SSI(:,3), SSI(:,1), SSI(:,5)-SSI(:,6));
+% plot(SSI2(:,1), SSI2(:,2)-SSI2(:,3), SSI2(:,1), SSI2(:,5)-SSI2(:,6));
 % legend('Hip','Knee');
-% xlabel('Time (s)'); ylabel('Position (rad)');
-% title('SSI position');
+% xlabel('Time (s)'); ylabel('Position (rad)'); ylim([-.1, .1]);
+% title('SSI2 position');
 % subplot(3,1,2);
-% plot(SSI(:,1),SSI(:,4),SSI(:,1),SSI(:,7));
+% plot(SSI2(:,1),SSI2(:,4),SSI2(:,1),SSI2(:,7));
 % legend('Hip','Knee');
 % xlabel('Time (s)'); ylabel('Torque (Nm)');
-% title('SSI slave force');
+% title('SSI2 slave force');
 % subplot(3,1,3);
-% plot(SSI(:,1),SSI(:,8));
+% plot(SSI2(:,1),SSI2(:,8));
 % title('Gain Scaling');
 % xlabel('Time (s)');
+
 
 
 %% for velocities...

@@ -2,7 +2,7 @@
 
 %% import and organize data
 
-test = importdata("../../3DOF_controller/Logs/172442_01_25_2019.log");
+test = importdata("../../3DOF_controller/Logs/133231_01_29_2019.log");
 
 % only want data from when scaling column is at desired value
 % data is: time, q1[0], q1[1], q1[2], p1[0], p1[1], p1[2]
@@ -32,7 +32,7 @@ end
 %  p[1] = L1*c1 + L3*s1*c23 + L2*c2*s1;
 %  p[2] = L1*s1 - L3*c1*c23 - L2*c1*c2;
 
-% fix knee offset problem
+% fix knee offset problem???
 PD(:,4) = -PD(:,4)+(2*-2.766);
 
 Labad = 0.0577;
@@ -61,12 +61,13 @@ PD_end = [Lknee*s23 + Lhip*s2, Labad*c1 + Lknee*s1.*c23 + Lhip*c2.*s1, Labad*s1 
 % vid = VideoWriter('MC_PDcycle.avi');
 % open(vid)
 fig1 = figure;
-for ii=1:100:size(PD_end,1)
+for ii=1:10:size(PD_end,1)
     
     plot3([0, PD_hip(ii,2), PD_knee(ii,2), PD_end(ii,2)],[0, PD_hip(ii,3), PD_knee(ii,3), PD_end(ii,3)],[0, PD_hip(ii,1), PD_knee(ii,1), PD_end(ii,1)]);
     hold on
     plot3([0,PD_hip(ii,2),PD_knee(ii,2)],[0,PD_hip(ii,3),PD_knee(ii,3)],[0,PD_hip(ii,1),PD_knee(ii,1)],'*g','LineWidth',2);
     plot3(PD_end(ii,2),PD_end(ii,3),PD_end(ii,1),'*r','LineWidth',2);
+    plot3(PD(ii,6),PD(ii,7),PD(ii,5),'*b','LineWidth',1);
     hold off
     axis equal
     grid on
