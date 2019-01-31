@@ -4,44 +4,44 @@
 
 clear all
 
-test = importdata("../../3DOF_controller/Logs/151704_01_29_2019.log");
-% test2 = importdata("../../3DOF_controller/Logs/141313_01_29_2019.log");
+% test = importdata("../../3DOF_controller/Logs/151704_01_29_2019.log");
+test2 = importdata("../../3DOF_controller/Logs/164427_01_29_2019.log");
 
 % only want data from when scaling column is at desired value
 % data is: time, q1[1], q2[1], tau2[1], q1[2], q2[2], tau2[2]
-tPD = 0;
-tSSI = 0;
-jj = 1;
-kk = 1;
-
-for ii = 1:size(test,1)
-    if ((test(ii,1)==1)) %&&(test(ii,2)==50))
-        PD(jj,:) = [tPD, test(ii,3:end)/1000, test(ii,2)/100];
-        tPD = tPD + 0.001;
-        jj = jj + 1;
-    elseif ((test(ii,1)==3))%&&(test(ii,2)==50))
-        SSI(kk,:) = [tSSI, test(ii,3:end)/1000, test(ii,2)/100];
-        tSSI = tSSI + 0.001;
-        kk = kk + 1;
-    end        
-end
-
 % tPD = 0;
 % tSSI = 0;
 % jj = 1;
 % kk = 1;
 % 
-% for ii = 1:size(test2,1)
-%     if ((test2(ii,1)==1)) %&&(test(ii,2)==50))
-%         PD2(jj,:) = [tPD, test2(ii,3:end)/1000, test2(ii,2)/100];
+% for ii = 1:size(test,1)
+%     if ((test(ii,1)==1)) %&&(test(ii,2)==50))
+%         PD(jj,:) = [tPD, test(ii,3:end)/1000, test(ii,2)/100];
 %         tPD = tPD + 0.001;
 %         jj = jj + 1;
-%     elseif ((test2(ii,1)==3))%&&(test(ii,2)==50))
-%         SSI2(kk,:) = [tSSI, test2(ii,3:end)/1000, test2(ii,2)/100];
+%     elseif ((test(ii,1)==3))%&&(test(ii,2)==50))
+%         SSI(kk,:) = [tSSI, test(ii,3:end)/1000, test(ii,2)/100];
 %         tSSI = tSSI + 0.001;
 %         kk = kk + 1;
 %     end        
 % end
+
+tPD = 0;
+tSSI = 0;
+jj = 1;
+kk = 1;
+
+for ii = 1:size(test2,1)
+    if ((test2(ii,1)==1)) %&&(test(ii,2)==50))
+        PD2(jj,:) = [tPD, test2(ii,3:end)/1000, test2(ii,2)/100];
+        tPD = tPD + 0.001;
+        jj = jj + 1;
+    elseif ((test2(ii,1)==3))%&&(test(ii,2)==50))
+        SSI2(kk,:) = [tSSI, test2(ii,3:end)/1000, test2(ii,2)/100];
+        tSSI = tSSI + 0.001;
+        kk = kk + 1;
+    end        
+end
 
 %% add cartesian coords of end effector
 
@@ -137,25 +137,21 @@ end
 % xlabel('Time (s)');
 
 figure;
-subplot(4,1,1)
-plot(SSI(:,1), SSI(:,2), SSI(:,1), SSI(:,5));
-legend('Hip','Knee');
+subplot(3,1,1)
+plot(SSI2(:,1), SSI2(:,2)); %, SSI2(:,1), SSI2(:,5));
+% legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Position (rad)'); ylim([-.1, .1]);
 title('SSI position');
-subplot(4,1,2);
-plot(SSI(:,1),SSI(:,3),SSI(:,1),SSI(:,6));
-legend('Hip','Knee');
+subplot(3,1,2);
+plot(SSI2(:,1),SSI2(:,3)); %,SSI2(:,1),SSI2(:,6));
+% legend('Hip','Knee');
 xlabel('Time (s)'); ylabel('Torque (Nm)');
 title('SSI delO');
-subplot(4,1,3);
-plot(SSI(:,1),SSI(:,4),SSI(:,1),SSI(:,4)-SSI(:,3),SSI(:,1),SSI(:,7),SSI(:,1),SSI(:,7)+SSI(:,6));
-legend('Hip','Hip no delO','Knee','Knee no delO');
+subplot(3,1,3);
+plot(SSI2(:,1),SSI2(:,4),SSI2(:,1),SSI2(:,4)-SSI2(:,3)); %,SSI2(:,1),SSI2(:,7),SSI2(:,1),SSI2(:,7)+SSI2(:,6));
+legend('Hip','Hip no delO'); %,'Knee','Knee no delO');
 xlabel('Time (s)'); ylabel('Torque (Nm)');
 title('SSI slave force');
-subplot(4,1,4);
-plot(SSI(:,1),SSI(:,8));
-title('Gain Scaling');
-xlabel('Time (s)');
 
 % figure;
 % subplot(3,1,1)
