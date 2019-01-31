@@ -2,6 +2,7 @@
 #define DT .001 // .0006
 #include "mbed.h"
 #include "math_ops.h"
+#include "math.h"
 
 
 Serial       pc(PA_2, PA_3);
@@ -64,13 +65,23 @@ float kd_q = 1.5f;
 int enabled = 0;
 float scaling = 0;
 
+// for force control
+float fdes1[3];
+float Tref1[3];
+int VE_flag = 0;
+int time_in_VE = 0;
+
 // SSI values
-float Eout[3];
+float EoutA[3];
+float EoutB[3];
 float delO[3];
-float delOnew[3];
+float delOnewA[3];
+float delOnewB[3];
 int SSI_case[3];
-float xtop[3];
-float ftop[3];
+float xtopA[3];
+float xtopB[3];
+float ftopA[3];
+float ftopB[3];
 float diffq[3];
 float diffdq[3];
 float tau1_SSI[3];
@@ -94,21 +105,23 @@ int control_mode = 1;
  #define L2 0.2088f
  #define L3 0.175f
  
+
+ 
  void kinematics(const float q[3], const float dq[3], float* p, float* v, float (* J)[3], float (* M)[3]){
      const float s1 = sinf(q[0]);
      const float s2 = sinf(q[1]);
-     const float s3 = sinf(q[2]);
+     const float s3 = sinf(q[2]); //-q[2]+(2.0f*offset[2]));
      const float c1 = cosf(q[0]);
      const float c2 = cosf(q[1]);
-     const float c3 = cosf(q[2]);
+     const float c3 = cosf(q[2]); //-q[2]+(2.0f*offset[2]));
      
      const float c23 = c2*c3 - s2*s3;
      const float s23 = s2*c3 + c2*s3;
      
      /// End effector position
-     p[0] = L3*s23 + L2*s2;
-     p[1] = L1*c1 + L3*s1*c23 + L2*c2*s1;
-     p[2] = L1*s1 - L3*c1*c23 - L2*c1*c2;
+     p[0] = L3*s23 + L2*s2; // z
+     p[1] = L1*c1 + L3*s1*c23 + L2*c2*s1; // x
+     p[2] = L1*s1 - L3*c1*c23 - L2*c1*c2; // y
      
      // Leg Jacobian
      J[0][0] = 0;
@@ -208,8 +221,8 @@ void unpack_reply(CANMessage msg, int leg_num){
     float qraw = p;
     float vraw = v;
     if(id==3){  //Extra belt 28:18 belt reduction on the knees;
-        p = -p*0.643f;
-        v = -v*0.643f;
+        p = p*0.643f;
+        v = v*0.643f;
         }
     else if(id==1){
         p = -p;
@@ -265,12 +278,14 @@ void WriteAll(){
 /// Program interrupt ///
 void sendCMD(){
     toggle2 = 1;    // debug pin
-    counter ++;
+    //counter ++;
     scaling = .99f*scaling + .01f*knob.read();  // gain scaling knob
     
     // Do kinematics calculations
     kinematics(q1, dq1, p1, v1, J1, M1);
     kinematics(q2, dq2, p2, v2, J2, M2);
+    
+    
     
     if(enabled){
             switch(control_mode){
@@ -291,9 +306,35 @@ void sendCMD(){
                     break;
                 case 1:
                 {
+                    const float VE_z = -0.05f;
+                    
                     //Joint Space Coupling
                     KD1[0] = 0;  KD1[1] = 0;  KD1[2] = 0;
                     KD2[0] = 0;  KD2[1] = 0;  KD2[2] = 0;
+                    
+                    // calculate desired forces
+                    fdes1[0] = 3.0; fdes1[1] = 0; fdes1[2] = 0;
+                    Tref1[0] = 0; Tref1[1] = 0; Tref1[2] = 0;
+                    for(int i = 0; i<3; i++){
+                        for(int j = 0; j<3; j++){
+                            Tref1[i] += J1[j][i]*fdes1[j];
+                        }
+                    }
+                    
+                    if (time_in_VE>0) {
+                        time_in_VE-=1;
+                    }
+                    
+                    if (p1[0]<=VE_z) {
+                        if (VE_flag==0) {
+                            VE_flag=1;
+                            time_in_VE = 75;
+                        }
+                    } else {
+                        VE_flag = 0;
+                    }
+                    
+                    
                     /*
                     float deltaq1 = q2[0] - q1[0];
                     float deltaq2 = q2[1] - q1[1];
@@ -313,20 +354,34 @@ void sendCMD(){
                     tau2[1] = scaling*(kp_q*(q1[1] - q2[1]) + kd_q*(dq1[1] - dq2[1]));
                     tau1[2] = -scaling*((kp_q/1.5f)*(q2[2] - q1[2]) + (kd_q/2.25f)*(dq2[2] - dq1[2]));
                     tau2[2] = -scaling*((kp_q/1.5f)*(q1[2] - q2[2]) + (kd_q/2.25f)*(dq1[2] - dq2[2]));
+                                  
+                    //pack_cmd(&abad1, KD1[0]+.005f, tau1[0]); 
+                    //pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
+                    //pack_cmd(&hip1, KD1[1]+.005f, tau1[1]); 
+                    //pack_cmd(&hip2, KD2[1]+.005f, tau2[1]); 
+                    //pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
+                    //pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     
-                    pack_cmd(&abad1, KD1[0]+.005f, tau1[0]); 
-                    pack_cmd(&abad2, KD2[0]+.005f, tau2[0]); 
-                    pack_cmd(&hip1, KD1[1]+.02f, tau1[1]); 
-                    pack_cmd(&hip2, KD2[1]+.02f, tau2[1]); 
-                    pack_cmd(&knee1, KD1[2]+.0033f, tau1[2]); 
-                    pack_cmd(&knee2, KD2[2]+.0033f, tau2[2]); 
                     
-                    //pack_cmd(&abad1, 0, 0); 
-                    //pack_cmd(&abad2, 0, 0); 
-                    //pack_cmd(&hip1, 0, 0); 
-                    //pack_cmd(&hip2, 0, 0); 
-                    //pack_cmd(&knee1, 0, 0); 
-                    //pack_cmd(&knee2, 0, 0); 
+                    if (time_in_VE>0) {
+                    
+                        pack_cmd(&abad1, 0, Tref1[0]); 
+                        pack_cmd(&abad2, 0, 0); 
+                        pack_cmd(&hip1, 0, Tref1[1]); 
+                        pack_cmd(&hip2, 0, 0); 
+                        pack_cmd(&knee1, 0, Tref1[2]); 
+                        pack_cmd(&knee2, 0, 0); 
+                        
+                    } else {
+                        
+                        pack_cmd(&abad1, 0, 0); 
+                        pack_cmd(&abad2, 0, 0); 
+                        pack_cmd(&hip1, 0, 0); 
+                        pack_cmd(&hip2, 0, 0); 
+                        pack_cmd(&knee1, 0, 0); 
+                        pack_cmd(&knee2, 0, 0);
+                        
+                    }
                     
                     //printf("%d    %d    %d\n\r", (int)(q1[0]*1000), (int)(q1[1]*1000), (int)(q1[2]*1000));
                     //printf("%f  %f\n\r", q1[1]-q2[1], tau1[1]);
@@ -398,15 +453,15 @@ void sendCMD(){
                 { 
                     // SSI controller in joint space
                     const float Ke = 200.0f;
-                    const float Ke_d = 1.5f;
+                    const float Ke_d = 0.0f;
                     const float Tmax = 3.0f;
                     const float Tmin = -3.0f;
-                    const float Omax = 1.0f;
-                    const float Omin = -1.0f;
+                    const float Omax = 2.0f;
+                    const float Omin = -2.0f;
 
                     // joint space "bonus damping"
-                    KD1[0] = 0.005f;  KD1[1] = 0.02f;  KD1[2] = 0.0033f;
-                    KD2[0] = 0.005f;  KD2[1] = 0.02f;  KD2[2] = 0.0033f;
+                    KD1[0] = 0.005f;  KD1[1] = 0.05f;  KD1[2] = 0.033f;
+                    KD2[0] = 0.005f;  KD2[1] = 0.05f;  KD2[2] = 0.033f;
 
                     // diff variables
                     diffq[0] = q1[0]-q2[0]; diffq[1] = q1[1]-q2[1]; diffq[2] = q1[2]-q2[2];
@@ -416,31 +471,49 @@ void sendCMD(){
                     for(int j = 0; j<3; j++) { // determine SSI case
                         SSI_case[j] = checkSSI(j, diffq, diffdq);
                     }
-                    for(int j = 0; j<3; j++) { // integrate energy
+                    for(int j = 0; j<3; j++) { // integrate energy in phase 1 or 2
+                        if (SSI_case[j]==1) { // reset second SSI phase 
+                            delO[j] = fmaxf(fminf(delOnewB[j], Omax), Omin);
+                            EoutB[j] = 0.0;
+                            xtopB[j] = 0.0;
+                            ftopB[j] = 0.0;
+                        }
                         if (SSI_case[j]==1 | SSI_case[j]==2) {
                             if (SSI_case[j]==1) {
-                                if (diffq[j]>xtop[j]) {
-                                    xtop[j] = diffq[j];
+                                if (diffq[j]>xtopA[j]) {
+                                    xtopA[j] = diffq[j];
                                 }
-                                if (tau1_SSI[j]>ftop[j]) {
-                                    ftop[j] = tau2_SSI[j];
+                                if (tau1_SSI[j]>ftopA[j]) {
+                                    ftopA[j] = tau2_SSI[j];
                                 }
                             } else {
-                                Eout[j] = Eout[j] - (tau2_SSI[j]*diffdq[j]*(float)DT); //(Ke*diffq[j]*diffdq[j]*(float)DT); 
+                                EoutA[j] = EoutA[j] - (tau2_SSI[j]*diffdq[j]*(float)DT); //(Ke*diffq[j]*diffdq[j]*(float)DT); 
                             }
-                            delOnew[j] = ((2*Eout[j])/xtop[j]) - ((xtop[j]*ftop[j])/2);
+                            delOnewA[j] = ((2*EoutA[j])/xtopA[j]) - ((xtopA[j]*ftopA[j])/2);
                         }
 
-                        if (SSI_case[j]==3) {
-                            delO[j] = fmaxf(fminf(delOnew[j], Omax), Omin);
-                            Eout[j] = 0.0;
-                            xtop[j] = 0.0;
-                            ftop[j] = 0.0;
+                        if (SSI_case[j]==3) { // reset first SSI phase
+                            delO[j] = fmaxf(fminf(delOnewA[j], Omax), Omin);
+                            EoutA[j] = 0.0;
+                            xtopA[j] = 0.0;
+                            ftopA[j] = 0.0;
+                        }
+                        if (SSI_case[j]==3 | SSI_case[j]==4) {
+                            if (SSI_case[j]==3) {
+                                if (diffq[j]>xtopB[j]) {
+                                    xtopB[j] = diffq[j];
+                                }
+                                if (tau1_SSI[j]>ftopB[j]) {
+                                    ftopB[j] = tau2_SSI[j];
+                                }
+                            } else {
+                                EoutB[j] = EoutB[j] - (tau2_SSI[j]*diffdq[j]*(float)DT); //(Ke*diffq[j]*diffdq[j]*(float)DT); 
+                            }
+                            delOnewB[j] = ((2*EoutB[j])/xtopB[j]) - ((xtopB[j]*ftopB[j])/2);
                         }
                     }
                     
                     // torques
-                    delO[0] = 0; // just do PD on ab-ad motor
                     if (diffq[0]>0) { // or diffdq?
                         tau1_SSI[0] = fmaxf(fminf(-scaling*(Ke*(-diffq[0]) + Ke_d*(-diffdq[0]) - delO[0]), Tmax), Tmin);
                         tau2_SSI[0] = fmaxf(fminf(-scaling*(Ke*(diffq[0]) + Ke_d*(diffdq[0]) + delO[0]), Tmax), Tmin);
@@ -730,12 +803,15 @@ int main() {
             if (control_mode==1) {
                 //printf("%d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)((q1[1]-q2[1])*1000), (int)(tau2[1]*1000), (int)((q1[2]-q2[2])*1000), (int)(tau2[2]*1000), 0);
                 
-                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(q1[1]*1000), (int)(q2[1]*1000), (int)(tau2[1]*1000), (int)(q1[2]*1000), (int)(q2[2]*1000), (int)(tau2[2]*1000));
+                //printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(q1[1]*1000), (int)(q2[1]*1000), (int)(tau2[1]*1000), (int)(q1[2]*1000), (int)(q2[2]*1000), (int)(tau2[2]*1000));
+                printf("%d, %d, %d, %d, %d, %d, %d\n\r", VE_flag, (int)(q1[0]*1000), (int)(q1[1]*1000), (int)(q1[2]*1000), (int)(Tref1[0]*1000), (int)(Tref1[1]*1000), (int)(Tref1[2]*1000));
                 }
             if (control_mode==3) {
                 //printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(1000*q1[2]), (int)(1000*q2[2]), (int)(1000*dq1[2]), (int)(1000*dq2[2]), (int)(1000*delO[2]), (int)(1000*tau1_SSI[2]));           
-                //printf("%d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(q1[1]*1000), (int)((diffq[1])*1000), (int)(tau2_SSI[1]*1000), (int)((diffdq[1])*1000), (int)(delO[1]*1000));
-                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(q1[1]*1000), (int)(q2[1]*1000), (int)(tau2_SSI[1]*1000), (int)(q1[2]*1000), (int)(q2[2]*1000), (int)(tau2_SSI[2]*1000));
+                
+                //printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(q1[1]*1000), (int)(q2[1]*1000), (int)(tau2_SSI[1]*1000), (int)(q1[2]*1000), (int)(q2[2]*1000), (int)(tau2_SSI[2]*1000));
+                
+                printf("%d, %d, %d, %d, %d, %d, %d, %d\n\r", control_mode, (int)(scaling*100), (int)(diffq[1]*1000), (int)(delO[1]*1000), (int)(tau2_SSI[1]*1000), (int)(diffq[2]*1000), (int)(delO[2]*1000), (int)(tau2_SSI[2]*1000));
 
                 }
             //u = t.read_us() - u;
