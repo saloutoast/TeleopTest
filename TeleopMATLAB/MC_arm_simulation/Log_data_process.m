@@ -5,12 +5,9 @@
 clear all
 test = importdata("../../3DOF_controller/Logs/115759_02_28_2019.log");
 
-
-
 % only want data from when scaling column is at desired value
 % data is: time, q1[0], q1[1], q1[2], dq1[0], dq1[1], dq1[2]
 tPD = 0;
-
 jj = 1;
 
 for ii = 1:size(test,1)
